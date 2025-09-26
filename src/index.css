@@ -8,35 +8,46 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Professional broadcasting theme */
+    --background: 222 15% 8%;
+    --foreground: 210 15% 92%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 222 15% 12%;
+    --card-foreground: 210 15% 92%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 222 15% 12%;
+    --popover-foreground: 210 15% 92%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 15% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 222 15% 16%;
+    --secondary-foreground: 210 15% 85%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 222 15% 16%;
+    --muted-foreground: 210 10% 65%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 210 15% 92%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 15% 92%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 222 15% 20%;
+    --input: 222 15% 16%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
+    /* Broadcasting specific colors */
+    --live: 120 100% 50%;
+    --warning: 45 100% 55%;
+    --offline: 0 0% 40%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 25%));
+    --gradient-preview: linear-gradient(180deg, hsl(222 15% 8% / 0.8), hsl(222 15% 12%));
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 

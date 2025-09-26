@@ -47,6 +47,9 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        live: "hsl(var(--live))",
+        warning: "hsl(var(--warning))",
+        offline: "hsl(var(--offline))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -80,10 +83,47 @@ export default {
             height: "0",
           },
         },
+        "pulse-ring": {
+          "0%": {
+            transform: "scale(0.8)",
+            opacity: "1",
+          },
+          "100%": {
+            transform: "scale(2.4)",
+            opacity: "0",
+          },
+        },
+        "voice-listening": {
+          "0%, 100%": {
+            transform: "scale(1)",
+            opacity: "0.7",
+          },
+          "50%": {
+            transform: "scale(1.1)",
+            opacity: "1",
+          },
+        },
+        "command-flash": {
+          "0%": {
+            backgroundColor: "hsl(var(--primary))",
+            transform: "scale(1)",
+          },
+          "50%": {
+            backgroundColor: "hsl(var(--accent))",
+            transform: "scale(1.05)",
+          },
+          "100%": {
+            backgroundColor: "hsl(var(--primary))",
+            transform: "scale(1)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-ring": "pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite",
+        "voice-listening": "voice-listening 2s ease-in-out infinite",
+        "command-flash": "command-flash 0.6s ease-in-out",
       },
     },
   },
