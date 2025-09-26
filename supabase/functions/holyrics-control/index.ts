@@ -22,20 +22,9 @@ serve(async (req) => {
     const { action, data = {} }: HolyricsRequest = await req.json();
     console.log('Action requested:', action, 'Data:', data);
 
-    const holyrics_api_base = Deno.env.get('HOLYRICS_API_BASE');
+    const holyrics_api_base = Deno.env.get('HOLYRICS_API_BASE') || 'https://api.holyrics.com.br';
     const token = 'd87EsX3MALpldAJr';
-
-    if (!holyrics_api_base) {
-      console.error('HOLYRICS_API_BASE not configured');
-      return new Response(
-        JSON.stringify({ error: 'API base URL not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
+    
     const url = `${holyrics_api_base}/request/${action}`;
     console.log('Making request to:', url);
 
@@ -43,6 +32,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'api_key': 'API_KEY',
         'token': token
       },
       body: JSON.stringify(data)
