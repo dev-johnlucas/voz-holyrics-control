@@ -22,10 +22,10 @@ serve(async (req) => {
     const { action, data = {} }: HolyricsRequest = await req.json();
     console.log('Action requested:', action, 'Data:', data);
 
-    const holyrics_api_base = Deno.env.get('HOLYRICS_API_BASE') || 'https://api.holyrics.com.br';
+    const holyrics_api_base = 'https://api.holyrics.com.br/send';
     const token = 'd87EsX3MALpldAJr';
     
-    const url = `${holyrics_api_base}/request/${action}`;
+    const url = holyrics_api_base;
     console.log('Making request to:', url);
 
     const response = await fetch(url, {
@@ -35,7 +35,7 @@ serve(async (req) => {
         'api_key': 'API_KEY',
         'token': token
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ action, ...data })
     });
 
     const result = await response.json();
