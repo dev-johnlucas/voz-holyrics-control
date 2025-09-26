@@ -4,14 +4,16 @@ import { PreviewScreen } from "./PreviewScreen";
 import { ControlButtons } from "./ControlButtons";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { useToast } from "@/hooks/use-toast";
+import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
 
 export const HolyricsDashboard = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentDisplay, setCurrentDisplay] = useState("standby");
   const [lastCommand, setLastCommand] = useState("");
   const { toast } = useToast();
+  const { openBible, closeBible, nextVerse, previousVerse, showImage, getCPInfo } = useHolyricsAPI();
 
-  const handleCommand = (command: string) => {
+  const handleCommand = async (command: string) => {
     if (!isConnected) {
       toast({
         title: "Sem conexão",
@@ -23,47 +25,83 @@ export const HolyricsDashboard = () => {
 
     setLastCommand(command);
 
-    // Simulate API calls to Holyrics
+    // Real API calls to Holyrics
     if (command.includes("abrir bíblia")) {
-      setCurrentDisplay("bíblia aberta");
-      toast({
-        title: "Comando executado",
-        description: "Bíblia aberta no Holyrics",
-      });
+      const result = await openBible();
+      if (result) {
+        setCurrentDisplay("bíblia aberta");
+        toast({
+          title: "Comando executado",
+          description: "Bíblia aberta no Holyrics",
+        });
+      }
     } else if (command.includes("fechar bíblia")) {
-      setCurrentDisplay("standby");
-      toast({
-        title: "Comando executado",
-        description: "Bíblia fechada",
-      });
+      const result = await closeBible();
+      if (result) {
+        setCurrentDisplay("standby");
+        toast({
+          title: "Comando executado",
+          description: "Bíblia fechada",
+        });
+      }
     } else if (command.includes("próximo versículo")) {
-      setCurrentDisplay("bíblia aberta - próximo versículo");
-      toast({
-        title: "Comando executado",
-        description: "Próximo versículo exibido",
-      });
+      const result = await nextVerse();
+      if (result) {
+        setCurrentDisplay("bíblia aberta - próximo versículo");
+        toast({
+          title: "Comando executado",
+          description: "Próximo versículo exibido",
+        });
+      }
     } else if (command.includes("versículo anterior")) {
-      setCurrentDisplay("bíblia aberta - versículo anterior");
-      toast({
-        title: "Comando executado",
-        description: "Versículo anterior exibido",
-      });
+      const result = await previousVerse();
+      if (result) {
+        setCurrentDisplay("bíblia aberta - versículo anterior");
+        toast({
+          title: "Comando executado",
+          description: "Versículo anterior exibido",
+        });
+      }
     } else if (["cruz", "pomba", "monte", "igreja"].some(img => command.includes(img))) {
       const imageName = ["cruz", "pomba", "monte", "igreja"].find(img => command.includes(img));
-      setCurrentDisplay(`exibindo imagem: ${imageName}`);
-      toast({
-        title: "Comando executado",
-        description: `Imagem "${imageName}" exibida`,
-      });
+      if (imageName) {
+        const result = await showImage(imageName);
+        if (result) {
+          setCurrentDisplay(`exibindo imagem: ${imageName}`);
+          toast({
+            title: "Comando executado",
+            description: `Imagem "${imageName}" exibida`,
+          });
+        }
+      }
     }
   };
 
-  const toggleConnection = () => {
-    setIsConnected(!isConnected);
+  const toggleConnection = async () => {
     if (!isConnected) {
-      setCurrentDisplay("standby");
+      // Test connection with Holyrics
+      const result = await getCPInfo();
+      if (result) {
+        setIsConnected(true);
+        setCurrentDisplay("standby");
+        toast({
+          title: "Conectado",
+          description: "Conectado com sucesso ao Holyrics",
+        });
+      } else {
+        toast({
+          title: "Falha na conexão",
+          description: "Não foi possível conectar ao Holyrics",
+          variant: "destructive",
+        });
+      }
     } else {
+      setIsConnected(false);
       setCurrentDisplay("desconectado");
+      toast({
+        title: "Desconectado",
+        description: "Desconectado do Holyrics",
+      });
     }
   };
 

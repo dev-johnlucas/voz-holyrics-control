@@ -1,1 +1,4 @@
 project_id = "novdqnkguozxatmfywnp"
+
+[functions.holyrics-control]
+verify_jwt = false
