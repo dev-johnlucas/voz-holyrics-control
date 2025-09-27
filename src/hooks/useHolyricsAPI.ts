@@ -40,6 +40,12 @@ export const useHolyricsAPI = () => {
   const previousVerse = () => callHolyricsAPI('PreviousVerse');
   const showImage = (imageName: string) => callHolyricsAPI('ShowImage', { name: imageName });
   const getCPInfo = () => callHolyricsAPI('GetCPInfo');
+  
+  // Funções adicionais baseadas na documentação oficial
+  const showVerse = (reference: string) => callHolyricsAPI('ShowVerse', { references: reference });
+  const toggleF8 = () => callHolyricsAPI('ToggleF8'); // Papel de parede
+  const toggleF9 = () => callHolyricsAPI('ToggleF9'); // Tela vazia
+  const toggleF10 = () => callHolyricsAPI('ToggleF10'); // Tela preta
 
   return {
     callHolyricsAPI,
@@ -48,6 +54,10 @@ export const useHolyricsAPI = () => {
     nextVerse,
     previousVerse,
     showImage,
-    getCPInfo
+    showVerse,
+    getCPInfo,
+    toggleF8,
+    toggleF9,
+    toggleF10
   };
 };
