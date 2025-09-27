@@ -22,20 +22,51 @@ serve(async (req) => {
     const { action, data = {} }: HolyricsRequest = await req.json();
     console.log('Action requested:', action, 'Data:', data);
 
-    const holyrics_api_base = 'https://api.holyrics.com.br/send';
-    const token = 'd87EsX3MALpldAJr';
+    // Mapear ações para o formato correto da API do Holyrics
+    let holyricsAction = action;
+    let requestData = data;
+
+    switch (action) {
+      case 'OpenBible':
+        holyricsAction = 'ShowVerse';
+        requestData = { references: 'João 3:16' }; // Versículo padrão
+        break;
+      case 'CloseBible':
+        holyricsAction = 'CloseCurrentPresentation';
+        requestData = {};
+        break;
+      case 'NextVerse':
+        holyricsAction = 'ActionNext';
+        requestData = {};
+        break;
+      case 'PreviousVerse':
+        holyricsAction = 'ActionPrevious';
+        requestData = {};
+        break;
+      case 'ShowImage':
+        holyricsAction = 'ShowImage';
+        requestData = { file: data.name || 'default.jpg' };
+        break;
+      case 'GetCPInfo':
+        holyricsAction = 'GetCPInfo';
+        requestData = {};
+        break;
+    }
+
+    const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
+    const token = Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
     
-    const url = holyrics_api_base;
-    console.log('Making request to:', url);
+    const url = `https://api.holyrics.com.br/send/${holyricsAction}`;
+    console.log('Making request to:', url, 'with data:', requestData);
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'api_key': 'API_KEY',
+        'api_key': api_key,
         'token': token
       },
-      body: JSON.stringify({ action, ...data })
+      body: JSON.stringify(requestData)
     });
 
     const result = await response.json();
