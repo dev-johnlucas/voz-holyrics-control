@@ -11,7 +11,7 @@ export const HolyricsDashboard = () => {
   const [currentDisplay, setCurrentDisplay] = useState("standby");
   const [lastCommand, setLastCommand] = useState("");
   const { toast } = useToast();
-  const { openBible, closeBible, nextVerse, previousVerse, showImage, getCPInfo } = useHolyricsAPI();
+  const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI();
 
   const handleCommand = async (command: string) => {
     if (!isConnected) {
@@ -25,55 +25,78 @@ export const HolyricsDashboard = () => {
 
     setLastCommand(command);
 
-    // Real API calls to Holyrics
-    if (command.includes("abrir bíblia")) {
-      const result = await openBible();
-      if (result) {
-        setCurrentDisplay("bíblia aberta");
-        toast({
-          title: "Comando executado",
-          description: "Bíblia aberta no Holyrics",
-        });
-      }
-    } else if (command.includes("fechar bíblia")) {
-      const result = await closeBible();
-      if (result) {
-        setCurrentDisplay("standby");
-        toast({
-          title: "Comando executado",
-          description: "Bíblia fechada",
-        });
-      }
-    } else if (command.includes("próximo versículo")) {
-      const result = await nextVerse();
-      if (result) {
-        setCurrentDisplay("bíblia aberta - próximo versículo");
-        toast({
-          title: "Comando executado",
-          description: "Próximo versículo exibido",
-        });
-      }
-    } else if (command.includes("versículo anterior")) {
-      const result = await previousVerse();
-      if (result) {
-        setCurrentDisplay("bíblia aberta - versículo anterior");
-        toast({
-          title: "Comando executado",
-          description: "Versículo anterior exibido",
-        });
-      }
-    } else if (["cruz", "pomba", "monte", "igreja"].some(img => command.includes(img))) {
-      const imageName = ["cruz", "pomba", "monte", "igreja"].find(img => command.includes(img));
-      if (imageName) {
-        const result = await showImage(imageName);
+    try {
+      // Verificar se é um comando de versículo específico
+      if (command.startsWith('verse:')) {
+        const reference = command.replace('verse:', '');
+        const result = await showVerse(reference);
         if (result) {
-          setCurrentDisplay(`exibindo imagem: ${imageName}`);
+          setCurrentDisplay(`Bíblia - ${reference}`);
           toast({
             title: "Comando executado",
-            description: `Imagem "${imageName}" exibida`,
+            description: `Abrindo ${reference}`,
           });
         }
+        return;
       }
+
+      // Comandos básicos
+      if (command.includes("abrir bíblia")) {
+        const result = await openBible();
+        if (result) {
+          setCurrentDisplay("bíblia aberta");
+          toast({
+            title: "Comando executado",
+            description: "Bíblia aberta no Holyrics",
+          });
+        }
+      } else if (command.includes("fechar bíblia")) {
+        const result = await closeBible();
+        if (result) {
+          setCurrentDisplay("standby");
+          toast({
+            title: "Comando executado",
+            description: "Bíblia fechada",
+          });
+        }
+      } else if (command.includes("próximo versículo")) {
+        const result = await nextVerse();
+        if (result) {
+          setCurrentDisplay("bíblia aberta - próximo versículo");
+          toast({
+            title: "Comando executado",
+            description: "Próximo versículo exibido",
+          });
+        }
+      } else if (command.includes("versículo anterior")) {
+        const result = await previousVerse();
+        if (result) {
+          setCurrentDisplay("bíblia aberta - versículo anterior");
+          toast({
+            title: "Comando executado",
+            description: "Versículo anterior exibido",
+          });
+        }
+      } else if (["cruz", "pomba", "monte", "igreja"].some(img => command.includes(img))) {
+        const imageName = ["cruz", "pomba", "monte", "igreja"].find(img => command.includes(img));
+        if (imageName) {
+          const result = await showImage(imageName);
+          if (result) {
+            setCurrentDisplay(`exibindo imagem: ${imageName}`);
+            toast({
+              title: "Comando executado",
+              description: `Imagem "${imageName}" exibida`,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao executar comando:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao executar comando",
+        variant: "destructive",
+      });
     }
   };
 

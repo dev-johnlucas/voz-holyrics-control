@@ -47,6 +47,10 @@ serve(async (req) => {
         holyricsAction = 'ShowImage';
         requestData = { file: data.name || 'default.jpg' };
         break;
+      case 'ShowVerse':
+        holyricsAction = 'ShowVerse';
+        requestData = { references: data.references || 'João 3:16' };
+        break;
       case 'GetCPInfo':
         holyricsAction = 'GetCPInfo';
         requestData = {};
