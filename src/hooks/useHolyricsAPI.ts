@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-export const useHolyricsAPI = () => {
+export const useHolyricsAPI = (selectedChurch?: any) => {
   const { toast } = useToast();
 
   const callHolyricsAPI = async (action: string, data?: Record<string, any>) => {
@@ -9,7 +9,11 @@ export const useHolyricsAPI = () => {
       console.log('Calling Holyrics API:', action, data);
       
       const { data: result, error } = await supabase.functions.invoke('holyrics-control', {
-        body: { action, data }
+        body: { 
+          action, 
+          data,
+          church: selectedChurch // Passar dados da igreja para a edge function
+        }
       });
 
       if (error) {

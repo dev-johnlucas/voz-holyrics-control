@@ -8,9 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 interface ConnectionStatusProps {
   isConnected: boolean;
   onToggleConnection: () => void;
+  churchName?: string;
 }
 
-export const ConnectionStatus = ({ isConnected, onToggleConnection }: ConnectionStatusProps) => {
+export const ConnectionStatus = ({ isConnected, onToggleConnection, churchName }: ConnectionStatusProps) => {
   const [lastPing, setLastPing] = useState<Date | null>(null);
   const { toast } = useToast();
 
@@ -57,7 +58,9 @@ export const ConnectionStatus = ({ isConnected, onToggleConnection }: Connection
           
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium">Holyrics API</span>
+              <span className="font-medium">
+                {churchName ? `${churchName} - Holyrics` : "Holyrics API"}
+              </span>
               <Badge 
                 variant={isConnected ? "default" : "destructive"}
                 className={isConnected ? "bg-live text-black" : ""}
@@ -74,7 +77,7 @@ export const ConnectionStatus = ({ isConnected, onToggleConnection }: Connection
             
             {!isConnected && (
               <p className="text-xs text-muted-foreground">
-                localhost:5000 - Aguardando conexão
+                {churchName ? `${churchName} - Aguardando conexão` : "Aguardando conexão"}
               </p>
             )}
           </div>

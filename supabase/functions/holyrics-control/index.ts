@@ -8,6 +8,14 @@ const corsHeaders = {
 interface HolyricsRequest {
   action: string;
   data?: Record<string, any>;
+  church?: {
+    id: string;
+    name: string;
+    holyrics_ip: string;
+    holyrics_port: number;
+    api_key?: string;
+    token?: string;
+  };
 }
 
 serve(async (req) => {
@@ -19,8 +27,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, data = {} }: HolyricsRequest = await req.json();
-    console.log('Action requested:', action, 'Data:', data);
+    const { action, data = {}, church }: HolyricsRequest = await req.json();
+    console.log('Action requested:', action, 'Data:', data, 'Church:', church?.name);
 
     // Mapear ações para o formato correto da API do Holyrics
     let holyricsAction = action;
@@ -61,11 +69,20 @@ serve(async (req) => {
         break;
     }
 
-    const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
-    const token = Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
+    // Usar configurações específicas da igreja se fornecidas, caso contrário usar fallback
+    const api_key = church?.api_key || Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
+    const token = church?.token || Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
     
-    const url = `https://api.holyrics.com.br/send/${holyricsAction}`;
-    console.log('Making request to:', url, 'with data:', requestData);
+    // Construir URL baseado nas configurações da igreja
+    let baseUrl = 'https://api.holyrics.com.br';
+    if (church?.holyrics_ip && church.holyrics_ip !== 'localhost') {
+      // Se especificado IP customizado, usar protocolo local
+      const protocol = church.holyrics_ip.includes('localhost') || church.holyrics_ip.startsWith('192.168') || church.holyrics_ip.startsWith('10.') ? 'http' : 'https';
+      baseUrl = `${protocol}://${church.holyrics_ip}:${church.holyrics_port || 8080}`;
+    }
+    
+    const url = `${baseUrl}/send/${holyricsAction}`;
+    console.log('Making request to:', url, 'with data:', requestData, 'for church:', church?.name);
 
     const response = await fetch(url, {
       method: 'POST',

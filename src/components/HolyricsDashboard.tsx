@@ -5,15 +5,18 @@ import { ControlButtons } from "./ControlButtons";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { ImageGallery } from "./ImageGallery";
 import { AudioConfig } from "./AudioConfig";
+import { ChurchSelector } from "./ChurchSelector";
 import { useToast } from "@/hooks/use-toast";
 import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
+import { Church } from "@/hooks/useChurches";
 
 export const HolyricsDashboard = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentDisplay, setCurrentDisplay] = useState("standby");
   const [lastCommand, setLastCommand] = useState("");
+  const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const { toast } = useToast();
-  const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI();
+  const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI(selectedChurch);
 
   const handleImageSelect = async (imageName: string) => {
     const result = await showImage(imageName);
@@ -115,7 +118,25 @@ export const HolyricsDashboard = () => {
     }
   };
 
+  const handleChurchSelect = (church: Church) => {
+    setSelectedChurch(church);
+    // Desconectar se estiver conectado quando trocar de igreja
+    if (isConnected) {
+      setIsConnected(false);
+      setCurrentDisplay("desconectado");
+    }
+  };
+
   const toggleConnection = async () => {
+    if (!selectedChurch) {
+      toast({
+        title: "Igreja não selecionada",
+        description: "Selecione uma igreja antes de conectar",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!isConnected) {
       // Test connection with Holyrics
       const result = await getCPInfo();
@@ -124,12 +145,12 @@ export const HolyricsDashboard = () => {
         setCurrentDisplay("standby");
         toast({
           title: "Conectado",
-          description: "Conectado com sucesso ao Holyrics",
+          description: `Conectado ao Holyrics da ${selectedChurch.name}`,
         });
       } else {
         toast({
           title: "Falha na conexão",
-          description: "Não foi possível conectar ao Holyrics",
+          description: `Não foi possível conectar ao Holyrics da ${selectedChurch.name}`,
           variant: "destructive",
         });
       }
@@ -138,7 +159,7 @@ export const HolyricsDashboard = () => {
       setCurrentDisplay("desconectado");
       toast({
         title: "Desconectado",
-        description: "Desconectado do Holyrics",
+        description: `Desconectado do Holyrics da ${selectedChurch.name}`,
       });
     }
   };
@@ -156,10 +177,14 @@ export const HolyricsDashboard = () => {
           </p>
         </div>
 
+        {/* Church Selection */}
+        <ChurchSelector onChurchSelect={handleChurchSelect} />
+
         {/* Connection Status */}
         <ConnectionStatus 
           isConnected={isConnected}
           onToggleConnection={toggleConnection}
+          churchName={selectedChurch?.name}
         />
 
         {/* Main Content */}
