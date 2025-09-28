@@ -123,6 +123,10 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       recognitionInstance.continuous = true;
       recognitionInstance.interimResults = false;
       recognitionInstance.lang = 'pt-BR';
+      
+      // Configurações otimizadas para mesa de som
+      recognitionInstance.maxAlternatives = 1;
+      recognitionInstance.audioTrack = true;
 
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];

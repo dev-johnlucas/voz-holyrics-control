@@ -55,6 +55,10 @@ serve(async (req) => {
         holyricsAction = 'GetCPInfo';
         requestData = {};
         break;
+      case 'GetImages':
+        holyricsAction = 'GetImages';
+        requestData = {};
+        break;
     }
 
     const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';

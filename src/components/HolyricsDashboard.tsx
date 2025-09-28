@@ -3,6 +3,8 @@ import { VoiceControl } from "./VoiceControl";
 import { PreviewScreen } from "./PreviewScreen";
 import { ControlButtons } from "./ControlButtons";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { ImageGallery } from "./ImageGallery";
+import { AudioConfig } from "./AudioConfig";
 import { useToast } from "@/hooks/use-toast";
 import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
 
@@ -12,6 +14,17 @@ export const HolyricsDashboard = () => {
   const [lastCommand, setLastCommand] = useState("");
   const { toast } = useToast();
   const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI();
+
+  const handleImageSelect = async (imageName: string) => {
+    const result = await showImage(imageName);
+    if (result) {
+      setCurrentDisplay(`exibindo imagem: ${imageName}`);
+      toast({
+        title: "Imagem exibida",
+        description: `"${imageName}" está sendo exibida`,
+      });
+    }
+  };
 
   const handleCommand = async (command: string) => {
     if (!isConnected) {
@@ -53,10 +66,12 @@ export const HolyricsDashboard = () => {
       } else if (command.includes("fechar bíblia")) {
         const result = await closeBible();
         if (result) {
-          setCurrentDisplay("standby");
+          // Mostrar tema principal após fechar bíblia
+          await showImage("tema principal");
+          setCurrentDisplay("tema principal");
           toast({
             title: "Comando executado",
-            description: "Bíblia fechada",
+            description: "Bíblia fechada - Tema principal exibido",
           });
         }
       } else if (command.includes("próximo versículo")) {
@@ -134,10 +149,10 @@ export const HolyricsDashboard = () => {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Controle por Voz - Holyrics
+            Holy Voice
           </h1>
           <p className="text-muted-foreground mt-2">
-            Dashboard de controle com pré-visualização em tempo real
+            Controle Inteligente para Holyrics - Comando por Voz Profissional
           </p>
         </div>
 
@@ -164,6 +179,11 @@ export const HolyricsDashboard = () => {
               onCommand={handleCommand}
               isConnected={isConnected}
             />
+            <ImageGallery 
+              isConnected={isConnected}
+              onImageSelect={handleImageSelect}
+            />
+            <AudioConfig />
           </div>
         </div>
 
