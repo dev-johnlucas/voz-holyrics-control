@@ -1,33 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { VoiceControl } from "./VoiceControl";
 import { PreviewScreen } from "./PreviewScreen";
 import { ControlButtons } from "./ControlButtons";
 import { ConnectionStatus } from "./ConnectionStatus";
-import { ImageGallery } from "./ImageGallery";
-import { AudioConfig } from "./AudioConfig";
-import { ChurchSelector } from "./ChurchSelector";
 import { useToast } from "@/hooks/use-toast";
 import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
-import { Church } from "@/hooks/useChurches";
 
 export const HolyricsDashboard = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [currentDisplay, setCurrentDisplay] = useState("standby");
   const [lastCommand, setLastCommand] = useState("");
-  const [selectedChurch, setSelectedChurch] = useState<Church | null>(null);
   const { toast } = useToast();
-  const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI(selectedChurch);
-
-  const handleImageSelect = async (imageName: string) => {
-    const result = await showImage(imageName);
-    if (result) {
-      setCurrentDisplay(`exibindo imagem: ${imageName}`);
-      toast({
-        title: "Imagem exibida",
-        description: `"${imageName}" está sendo exibida`,
-      });
-    }
-  };
+  const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI();
 
   const handleCommand = async (command: string) => {
     if (!isConnected) {
@@ -69,12 +53,10 @@ export const HolyricsDashboard = () => {
       } else if (command.includes("fechar bíblia")) {
         const result = await closeBible();
         if (result) {
-          // Mostrar tema principal após fechar bíblia
-          await showImage("tema principal");
-          setCurrentDisplay("tema principal");
+          setCurrentDisplay("standby");
           toast({
             title: "Comando executado",
-            description: "Bíblia fechada - Tema principal exibido",
+            description: "Bíblia fechada",
           });
         }
       } else if (command.includes("próximo versículo")) {
@@ -118,15 +100,6 @@ export const HolyricsDashboard = () => {
     }
   };
 
-  const handleChurchSelect = (church: Church) => {
-    setSelectedChurch(church);
-    // Desconectar se estiver conectado quando trocar de igreja
-    if (isConnected) {
-      setIsConnected(false);
-      setCurrentDisplay("desconectado");
-    }
-  };
-
   const toggleConnection = async () => {
     if (!isConnected) {
       // Test connection with Holyrics
@@ -136,12 +109,12 @@ export const HolyricsDashboard = () => {
         setCurrentDisplay("standby");
         toast({
           title: "Conectado",
-          description: `Conectado ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
+          description: "Conectado com sucesso ao Holyrics",
         });
       } else {
         toast({
           title: "Falha na conexão",
-          description: `Não foi possível conectar ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
+          description: "Não foi possível conectar ao Holyrics",
           variant: "destructive",
         });
       }
@@ -150,54 +123,10 @@ export const HolyricsDashboard = () => {
       setCurrentDisplay("desconectado");
       toast({
         title: "Desconectado",
-        description: `Desconectado do Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
+        description: "Desconectado do Holyrics",
       });
     }
   };
-
-  // Heartbeat para manter a conexão e detectar quedas
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (isConnected) {
-      interval = setInterval(async () => {
-        const ok = await getCPInfo();
-        if (!ok) {
-          setIsConnected(false);
-          setCurrentDisplay("desconectado");
-          toast({
-            title: "Conexão perdida",
-            description: `Tentando reconectar ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
-            variant: "destructive",
-          });
-        }
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isConnected, selectedChurch, getCPInfo, toast]);
-
-  // Auto-reconexão quando desconectar
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null;
-    if (!isConnected) {
-      interval = setInterval(async () => {
-        const ok = await getCPInfo();
-        if (ok) {
-          setIsConnected(true);
-          setCurrentDisplay("standby");
-          toast({
-          title: "Reconectado",
-          description: `Conectado ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
-        });
-          if (interval) clearInterval(interval);
-        }
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isConnected, selectedChurch, getCPInfo, toast]);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -205,21 +134,17 @@ export const HolyricsDashboard = () => {
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Holy Voice
+            Controle por Voz - Holyrics
           </h1>
           <p className="text-muted-foreground mt-2">
-            Controle Inteligente para Holyrics - Comando por Voz Profissional
+            Dashboard de controle com pré-visualização em tempo real
           </p>
         </div>
-
-        {/* Church Selection */}
-        <ChurchSelector onChurchSelect={handleChurchSelect} />
 
         {/* Connection Status */}
         <ConnectionStatus 
           isConnected={isConnected}
           onToggleConnection={toggleConnection}
-          churchName={selectedChurch?.name}
         />
 
         {/* Main Content */}
@@ -239,11 +164,6 @@ export const HolyricsDashboard = () => {
               onCommand={handleCommand}
               isConnected={isConnected}
             />
-            <ImageGallery 
-              isConnected={isConnected}
-              onImageSelect={handleImageSelect}
-            />
-            <AudioConfig />
           </div>
         </div>
 
