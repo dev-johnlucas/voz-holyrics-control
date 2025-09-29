@@ -128,15 +128,6 @@ export const HolyricsDashboard = () => {
   };
 
   const toggleConnection = async () => {
-    if (!selectedChurch) {
-      toast({
-        title: "Igreja não selecionada",
-        description: "Selecione uma igreja antes de conectar",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!isConnected) {
       // Test connection with Holyrics
       const result = await getCPInfo();
@@ -145,12 +136,12 @@ export const HolyricsDashboard = () => {
         setCurrentDisplay("standby");
         toast({
           title: "Conectado",
-          description: `Conectado ao Holyrics da ${selectedChurch.name}`,
+          description: `Conectado ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
         });
       } else {
         toast({
           title: "Falha na conexão",
-          description: `Não foi possível conectar ao Holyrics da ${selectedChurch.name}`,
+          description: `Não foi possível conectar ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
           variant: "destructive",
         });
       }
@@ -159,7 +150,7 @@ export const HolyricsDashboard = () => {
       setCurrentDisplay("desconectado");
       toast({
         title: "Desconectado",
-        description: `Desconectado do Holyrics da ${selectedChurch.name}`,
+        description: `Desconectado do Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
       });
     }
   };
@@ -167,7 +158,7 @@ export const HolyricsDashboard = () => {
   // Heartbeat para manter a conexão e detectar quedas
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if (isConnected && selectedChurch) {
+    if (isConnected) {
       interval = setInterval(async () => {
         const ok = await getCPInfo();
         if (!ok) {
@@ -175,7 +166,7 @@ export const HolyricsDashboard = () => {
           setCurrentDisplay("desconectado");
           toast({
             title: "Conexão perdida",
-            description: `Tentando reconectar ao Holyrics da ${selectedChurch.name}`,
+            description: `Tentando reconectar ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
             variant: "destructive",
           });
         }
@@ -189,16 +180,16 @@ export const HolyricsDashboard = () => {
   // Auto-reconexão quando desconectar
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if (!isConnected && selectedChurch) {
+    if (!isConnected) {
       interval = setInterval(async () => {
         const ok = await getCPInfo();
         if (ok) {
           setIsConnected(true);
           setCurrentDisplay("standby");
           toast({
-            title: "Reconectado",
-            description: `Conectado ao Holyrics da ${selectedChurch.name}`,
-          });
+          title: "Reconectado",
+          description: `Conectado ao Holyrics (${selectedChurch?.name ?? 'configuração padrão'})`,
+        });
           if (interval) clearInterval(interval);
         }
       }, 5000);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Mic, MicOff } from "lucide-react";
@@ -14,7 +14,7 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
   const { toast } = useToast();
 
   // Mapeamento de nomes de livros bíblicos em português
-  const booksMap: Record<string, string> = {
+  const booksMap = useMemo<Record<string, string>>(() => ({
     // Antigo Testamento
     'gênesis': 'Gn', 'genesis': 'Gn',
     'êxodo': 'Ex', 'exodo': 'Ex',
@@ -84,7 +84,7 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
     '3 joão': '3Jo', 'terceiro joao': '3Jo', '3joao': '3Jo',
     'judas': 'Jd',
     'apocalipse': 'Ap'
-  };
+  }), []);
 
   const commands = [
     "abrir bíblia",
@@ -167,7 +167,7 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
 
       setRecognition(recognitionInstance);
     }
-  }, [onCommand, toast, booksMap]);
+  }, []);
 
   const toggleListening = () => {
     if (!recognition) {
