@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { VoiceControl } from "./VoiceControl";
 import { PreviewScreen } from "./PreviewScreen";
 import { ControlButtons } from "./ControlButtons";
@@ -163,6 +163,50 @@ export const HolyricsDashboard = () => {
       });
     }
   };
+
+  // Heartbeat para manter a conexão e detectar quedas
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isConnected && selectedChurch) {
+      interval = setInterval(async () => {
+        const ok = await getCPInfo();
+        if (!ok) {
+          setIsConnected(false);
+          setCurrentDisplay("desconectado");
+          toast({
+            title: "Conexão perdida",
+            description: `Tentando reconectar ao Holyrics da ${selectedChurch.name}`,
+            variant: "destructive",
+          });
+        }
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isConnected, selectedChurch, getCPInfo, toast]);
+
+  // Auto-reconexão quando desconectar
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (!isConnected && selectedChurch) {
+      interval = setInterval(async () => {
+        const ok = await getCPInfo();
+        if (ok) {
+          setIsConnected(true);
+          setCurrentDisplay("standby");
+          toast({
+            title: "Reconectado",
+            description: `Conectado ao Holyrics da ${selectedChurch.name}`,
+          });
+          if (interval) clearInterval(interval);
+        }
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isConnected, selectedChurch, getCPInfo, toast]);
 
   return (
     <div className="min-h-screen bg-background p-6">

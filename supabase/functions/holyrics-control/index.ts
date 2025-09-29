@@ -70,29 +70,71 @@ serve(async (req) => {
     }
 
     // Usar configurações específicas da igreja se fornecidas, caso contrário usar fallback
-    const api_key = church?.api_key || Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
-    const token = church?.token || Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
+    const api_key = church?.api_key || Deno.env.get('HOLYRICS_API_KEY') || '';
+    const token = church?.token || Deno.env.get('HOLYRICS_TOKEN') || '';
     
-    // Construir URL baseado nas configurações da igreja
-    let baseUrl = 'https://api.holyrics.com.br';
-    if (church?.holyrics_ip && church.holyrics_ip !== 'localhost') {
-      // Se especificado IP customizado, usar protocolo local
-      const protocol = church.holyrics_ip.includes('localhost') || church.holyrics_ip.startsWith('192.168') || church.holyrics_ip.startsWith('10.') ? 'http' : 'https';
-      baseUrl = `${protocol}://${church.holyrics_ip}:${church.holyrics_port || 8080}`;
-    }
+    // Base URL: prioridade para HOLYRICS_API_BASE (se definido), depois IP/porta da igreja, depois localhost
+    const secretBase = Deno.env.get('HOLYRICS_API_BASE');
+    const baseUrl = (secretBase && secretBase.trim())
+      || (church?.holyrics_ip ? `http://${church.holyrics_ip}:${church.holyrics_port || 8080}` : 'http://localhost:8080');
     
-    const url = `${baseUrl}/send/${holyricsAction}`;
-    console.log('Making request to:', url, 'with data:', requestData, 'for church:', church?.name);
+    // Candidatos de endpoint (variações existentes na API)
+    const candidates = [
+      `${baseUrl}/api/control/send/${holyricsAction}`,
+      `${baseUrl}/send/${holyricsAction}`,
+    ];
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api_key': api_key,
-        'token': token
-      },
-      body: JSON.stringify(requestData)
-    });
+    // Anexar autenticação também via querystring para máxima compatibilidade
+    const qs = new URLSearchParams();
+    if (api_key) qs.set('api_key', api_key);
+    if (token) qs.set('token', token);
+
+    console.log('Holyrics base:', baseUrl, 'action:', holyricsAction, 'data:', requestData, 'church:', church?.name);
+
+    // Helper com timeout para evitar travas
+    const withTimeout = async (url: string) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(qs.toString() ? `${url}?${qs.toString()}` : url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api_key': api_key,
+            'token': token,
+          },
+          body: JSON.stringify(requestData),
+          signal: controller.signal,
+        });
+        return res;
+      } finally {
+        clearTimeout(id);
+      }
+    };
+
+    // Tenta o endpoint principal e depois o fallback
+    let response: Response | null = null;
+    let lastError: unknown = null;
+    for (const u of candidates) {
+      try {
+        console.log('Trying Holyrics endpoint:', u);
+        const res = await withTimeout(u);
+        if (res.ok) {
+          response = res;
+          break;
+        } else {
+          console.warn('Holyrics endpoint responded non-OK', u, res.status);
+          lastError = new Error(`Status ${res.status}`);
+        }
+      } catch (e) {
+        console.warn('Holyrics endpoint failed', u, e);
+        lastError = e;
+      }
+    }
+
+    if (!response) {
+      throw lastError || new Error('No Holyrics endpoint reachable');
+    }
 
     const result = await response.json();
     console.log('Holyrics API response:', result);
