@@ -40,6 +40,7 @@ export const useHolyricsAPI = () => {
   const previousVerse = () => callHolyricsAPI('PreviousVerse');
   const showImage = (imageName: string) => callHolyricsAPI('ShowImage', { name: imageName });
   const getCPInfo = () => callHolyricsAPI('GetCPInfo');
+  const getImages = () => callHolyricsAPI('GetImages');
   
   // Funções adicionais baseadas na documentação oficial
   const showVerse = (reference: string) => callHolyricsAPI('ShowVerse', { references: reference });
@@ -56,6 +57,7 @@ export const useHolyricsAPI = () => {
     showImage,
     showVerse,
     getCPInfo,
+    getImages,
     toggleF8,
     toggleF9,
     toggleF10
