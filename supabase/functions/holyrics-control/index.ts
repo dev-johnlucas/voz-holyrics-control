@@ -74,9 +74,27 @@ serve(async (req) => {
     const token = church?.token || Deno.env.get('HOLYRICS_TOKEN') || '';
     
     // Base URL: prioridade para HOLYRICS_API_BASE (se definido), depois IP/porta da igreja, depois localhost
-    const secretBase = Deno.env.get('HOLYRICS_API_BASE');
-    const baseUrl = (secretBase && secretBase.trim())
-      || (church?.holyrics_ip ? `http://${church.holyrics_ip}:${church.holyrics_port || 8080}` : 'http://localhost:8080');
+    const secretBaseRaw = Deno.env.get('HOLYRICS_API_BASE')?.trim();
+    const isHttp = (s?: string) => !!s && /^https?:\/\//i.test(s);
+    const validSecretBase = isHttp(secretBaseRaw) ? secretBaseRaw! : null;
+
+    if (secretBaseRaw && !validSecretBase) {
+      console.warn('Ignored invalid HOLYRICS_API_BASE. Must start with http(s)://', secretBaseRaw);
+    }
+
+    const churchBase = church?.holyrics_ip
+      ? `http://${church.holyrics_ip}:${church.holyrics_port || 8080}`
+      : '';
+
+    const baseUrl = validSecretBase || churchBase;
+
+    if (!baseUrl) {
+      console.warn('No valid base URL provided. Provide HOLYRICS_API_BASE or church.holyrics_ip/port');
+      return new Response(
+        JSON.stringify({ error: 'Holyrics base URL inválida. Configure HOLYRICS_API_BASE (http/https) ou defina IP/porta da igreja.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Candidatos de endpoint (variações existentes na API)
     const candidates = [
