@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Mic, MicOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
+import { parseBibleReferencePT } from "@/lib/bible";
 
 interface VoiceControlProps {
   onCommand: (command: string) => void;
@@ -11,80 +13,12 @@ interface VoiceControlProps {
 export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
+  const listeningRef = useRef(false);
+  const [imageNames, setImageNames] = useState<string[]>([]);
   const { toast } = useToast();
+  const { getImages } = useHolyricsAPI();
 
-  // Mapeamento de nomes de livros bíblicos em português
-  const booksMap: Record<string, string> = {
-    // Antigo Testamento
-    'gênesis': 'Gn', 'genesis': 'Gn',
-    'êxodo': 'Ex', 'exodo': 'Ex',
-    'levítico': 'Lv', 'levitico': 'Lv',
-    'números': 'Nm', 'numeros': 'Nm',
-    'deuteronômio': 'Dt', 'deuteronomio': 'Dt',
-    'josué': 'Js', 'josue': 'Js',
-    'juízes': 'Jz', 'juizes': 'Jz',
-    'rute': 'Rt',
-    '1 samuel': '1Sm', 'primeiro samuel': '1Sm', '1samuel': '1Sm',
-    '2 samuel': '2Sm', 'segundo samuel': '2Sm', '2samuel': '2Sm',
-    '1 reis': '1Rs', 'primeiro reis': '1Rs', '1reis': '1Rs',
-    '2 reis': '2Rs', 'segundo reis': '2Rs', '2reis': '2Rs',
-    '1 crônicas': '1Cr', 'primeiro cronicas': '1Cr', '1cronicas': '1Cr',
-    '2 crônicas': '2Cr', 'segundo cronicas': '2Cr', '2cronicas': '2Cr',
-    'esdras': 'Ed',
-    'neemias': 'Ne',
-    'ester': 'Et',
-    'jó': 'Jó', 'jo': 'Jó',
-    'salmos': 'Sl', 'salmo': 'Sl',
-    'provérbios': 'Pv', 'proverbios': 'Pv',
-    'eclesiastes': 'Ec',
-    'cantares': 'Ct', 'cânticos': 'Ct',
-    'isaías': 'Is', 'isaias': 'Is',
-    'jeremias': 'Jr',
-    'lamentações': 'Lm', 'lamentacoes': 'Lm',
-    'ezequiel': 'Ez',
-    'daniel': 'Dn',
-    'oseias': 'Os',
-    'joel': 'Jl',
-    'amós': 'Am', 'amos': 'Am',
-    'obadias': 'Ob',
-    'jonas': 'Jn',
-    'miqueias': 'Mq',
-    'naum': 'Na',
-    'habacuque': 'Hc',
-    'sofonias': 'Sf',
-    'ageu': 'Ag',
-    'zacarias': 'Zc',
-    'malaquias': 'Ml',
-    
-    // Novo Testamento
-    'mateus': 'Mt',
-    'marcos': 'Mc',
-    'lucas': 'Lc',
-    'joão': 'Jo', 'joao': 'Jo',
-    'atos': 'At',
-    'romanos': 'Rm',
-    '1 coríntios': '1Co', 'primeiro corintios': '1Co', '1corintios': '1Co',
-    '2 coríntios': '2Co', 'segundo corintios': '2Co', '2corintios': '2Co',
-    'gálatas': 'Gl', 'galatas': 'Gl',
-    'efésios': 'Ef', 'efesios': 'Ef',
-    'filipenses': 'Fp',
-    'colossenses': 'Cl',
-    '1 tessalonicenses': '1Ts', 'primeiro tessalonicenses': '1Ts', '1tessalonicenses': '1Ts',
-    '2 tessalonicenses': '2Ts', 'segundo tessalonicenses': '2Ts', '2tessalonicenses': '2Ts',
-    '1 timóteo': '1Tm', 'primeiro timoteo': '1Tm', '1timoteo': '1Tm',
-    '2 timóteo': '2Tm', 'segundo timoteo': '2Tm', '2timoteo': '2Tm',
-    'tito': 'Tt',
-    'filemom': 'Fm',
-    'hebreus': 'Hb',
-    'tiago': 'Tg',
-    '1 pedro': '1Pe', 'primeiro pedro': '1Pe', '1pedro': '1Pe',
-    '2 pedro': '2Pe', 'segundo pedro': '2Pe', '2pedro': '2Pe',
-    '1 joão': '1Jo', 'primeiro joao': '1Jo', '1joao': '1Jo',
-    '2 joão': '2Jo', 'segundo joao': '2Jo', '2joao': '2Jo',
-    '3 joão': '3Jo', 'terceiro joao': '3Jo', '3joao': '3Jo',
-    'judas': 'Jd',
-    'apocalipse': 'Ap'
-  };
+  // Referências bíblicas: usar util em src/lib/bible.ts
 
   const commands = [
     "abrir bíblia",
@@ -98,21 +32,7 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
   ];
 
   const parseVerseReference = (text: string): string | null => {
-    // Regex para capturar referências bíblicas como "João 3:16", "1 Coríntios 13:4", etc.
-    const versePattern = /(\d*\s*[a-záêôçõü]+)\s+(\d+)[\s:]+(\d+)/gi;
-    const match = versePattern.exec(text);
-    
-    if (match) {
-      const [, bookName, chapter, verse] = match;
-      const normalizedBook = bookName.toLowerCase().trim().replace(/\s+/g, ' ');
-      const abbreviation = booksMap[normalizedBook];
-      
-      if (abbreviation && chapter && verse) {
-        return `${abbreviation} ${chapter}:${verse}`;
-      }
-    }
-    
-    return null;
+    return parseBibleReferencePT(text);
   };
 
   useEffect(() => {
@@ -123,10 +43,18 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       recognitionInstance.continuous = true;
       recognitionInstance.interimResults = false;
       recognitionInstance.lang = 'pt-BR';
-      
-      // Configurações otimizadas para mesa de som
       recognitionInstance.maxAlternatives = 1;
-      recognitionInstance.audioTrack = true;
+
+      recognitionInstance.onstart = () => {
+        console.log('Reconhecimento iniciado');
+      };
+
+      recognitionInstance.onend = () => {
+        console.log('Reconhecimento encerrado');
+        if (listeningRef.current) {
+          try { recognitionInstance.start(); } catch (e) { console.warn('Falha ao reiniciar reconhecimento', e); }
+        }
+      };
 
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];
@@ -134,7 +62,7 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
           const transcript = lastResult[0].transcript.toLowerCase().trim();
           console.log('Comando de voz recebido:', transcript);
 
-          // Verificar se é uma referência bíblica primeiro
+          // 1) Referência bíblica
           const verseReference = parseVerseReference(transcript);
           if (verseReference) {
             toast({
@@ -145,46 +73,61 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
             return;
           }
 
-          // Verificar comandos básicos
+          // 2) Imagens por voz (inclui "tema principal")
+          const t = transcript;
+          const matchedImage = imageNames.find((n) => t.includes(n));
+          if (matchedImage || t.includes('tema principal')) {
+            const name = matchedImage ?? 'tema principal';
+            toast({ title: 'Imagem reconhecida', description: `Exibindo "${name}"` });
+            onCommand(`image:${name}`);
+            return;
+          }
+
+          // 3) Comandos básicos
           if (commands.some(cmd => transcript.includes(cmd))) {
             onCommand(transcript);
-            toast({
-              title: "Comando reconhecido",
-              description: `"${transcript}"`,
-            });
+            toast({ title: "Comando reconhecido", description: `"${transcript}"` });
           }
         }
       };
 
       recognitionInstance.onerror = () => {
-        toast({
-          title: "Erro no reconhecimento",
-          description: "Tente novamente",
-          variant: "destructive",
-        });
+        toast({ title: "Erro no reconhecimento", description: "Tente novamente", variant: "destructive" });
         setIsListening(false);
+        listeningRef.current = false;
       };
 
       setRecognition(recognitionInstance);
+
+      // Precarregar nomes de imagens do Holyrics
+      (async () => {
+        try {
+          const res = await getImages();
+          const names = Array.isArray(res?.images)
+            ? res.images.map((i: any) => (i.name || '').toLowerCase()).filter((x: string) => !!x)
+            : [];
+          setImageNames(names);
+        } catch (e) {
+          console.warn('Falha ao carregar imagens:', e);
+        }
+      })();
     }
-  }, [onCommand, toast, booksMap]);
+  }, [getImages, onCommand, toast]);
 
   const toggleListening = () => {
     if (!recognition) {
-      toast({
-        title: "Reconhecimento não suportado",
-        description: "Use os botões de controle",
-        variant: "destructive",
-      });
+      toast({ title: "Reconhecimento não suportado", description: "Use os botões de controle", variant: "destructive" });
       return;
     }
 
     if (isListening) {
-      recognition.stop();
+      try { recognition.stop(); } catch {}
       setIsListening(false);
+      listeningRef.current = false;
     } else {
-      recognition.start();
+      try { recognition.start(); } catch {}
       setIsListening(true);
+      listeningRef.current = true;
     }
   };
 
