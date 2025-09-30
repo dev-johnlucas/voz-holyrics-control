@@ -53,6 +53,13 @@ export const HolyricsDashboard = () => {
         return;
       }
 
+      // Verificar se é um comando de imagem
+      if (command.startsWith('image:')) {
+        const imageName = command.replace('image:', '');
+        await handleImageSelect(imageName);
+        return;
+      }
+
       // Comandos básicos
       if (command.includes("abrir bíblia")) {
         const result = await openBible();
