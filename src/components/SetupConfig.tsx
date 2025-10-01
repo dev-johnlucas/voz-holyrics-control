@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Loader2, Wifi, Globe } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import type { HolyricsConfig, ConnectionMode } from "@/types/holyrics-config";
 
 interface SetupConfigProps {
@@ -54,43 +55,33 @@ export const SetupConfig = ({ onConfigComplete, initialConfig }: SetupConfigProp
         ...(mode === 'web' && { apiKey }),
       };
 
-      // Test connection with a simple GetCPInfo request
-      const testUrl = mode === 'local' 
-        ? `${localHost}:${localPort}/api/GetCPInfo?token=${token}`
-        : 'https://api.holyrics.com.br/send/GetCPInfo';
+      // Test connection using edge function
+      const { data, error } = await supabase.functions.invoke('holyrics-control', {
+        body: { 
+          action: 'GetCPInfo',
+          data: {},
+          config
+        }
+      });
 
-      const options: RequestInit = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(mode === 'web' && {
-            'api_key': apiKey,
-            'token': token,
-          }),
-        },
-        body: JSON.stringify({}),
-        ...(mode === 'local' && { mode: 'no-cors' }),
-      };
+      if (error) {
+        throw new Error(error.message || 'Falha na comunicação');
+      }
 
-      const response = await fetch(testUrl, options);
-      
-      // For local mode with no-cors, we can't read the response
-      // So we assume success if no error was thrown
-      if (mode === 'local' || response.ok) {
+      if (data) {
         toast({
           title: "Conexão estabelecida!",
           description: "Configuração salva com sucesso",
         });
         onConfigComplete(config);
       } else {
-        const error = await response.json();
-        throw new Error(error.error || 'Falha na conexão');
+        throw new Error('Resposta inválida do servidor');
       }
     } catch (error) {
       console.error('Connection test failed:', error);
       toast({
         title: "Falha na conexão",
-        description: error instanceof Error ? error.message : "Verifique as configurações",
+        description: error instanceof Error ? error.message : "Verifique as configurações e se o Holyrics está rodando",
         variant: "destructive",
       });
     } finally {
