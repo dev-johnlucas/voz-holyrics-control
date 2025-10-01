@@ -1,15 +1,59 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { loadConfig } from "@/types/holyrics-config";
+import type { HolyricsConfig } from "@/types/holyrics-config";
 
 export const useHolyricsAPI = () => {
   const { toast } = useToast();
+
+  const getConfig = (): HolyricsConfig | null => {
+    return loadConfig();
+  };
 
   const callHolyricsAPI = async (action: string, data?: Record<string, any>) => {
     try {
       console.log('Calling Holyrics API:', action, data);
       
+      const config = getConfig();
+      if (!config) {
+        toast({
+          title: "Configuração necessária",
+          description: "Configure a conexão com o Holyrics primeiro",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      // For local mode, try direct connection first
+      if (config.mode === 'local' && config.localHost && config.localPort) {
+        try {
+          const localUrl = `${config.localHost}:${config.localPort}/api/${action}?token=${config.token}`;
+          console.log('Trying local connection:', localUrl);
+          
+          const response = await fetch(localUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data || {}),
+            mode: 'no-cors', // Required for localhost cross-origin requests
+          });
+
+          // With no-cors, we can't read the response, but if no error was thrown, assume success
+          console.log('Local connection successful');
+          return { status: 'ok' };
+        } catch (localError) {
+          console.warn('Local connection failed, falling back to edge function:', localError);
+        }
+      }
+
+      // Fallback to edge function (works for both modes)
       const { data: result, error } = await supabase.functions.invoke('holyrics-control', {
-        body: { action, data }
+        body: { 
+          action, 
+          data,
+          config // Pass config to edge function
+        }
       });
 
       if (error) {

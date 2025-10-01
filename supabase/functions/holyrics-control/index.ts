@@ -5,9 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface HolyricsConfig {
+  mode: 'local' | 'web';
+  localHost?: string;
+  localPort?: number;
+  token: string;
+  apiKey?: string;
+}
+
 interface HolyricsRequest {
   action: string;
   data?: Record<string, any>;
+  config?: HolyricsConfig;
 }
 
 serve(async (req) => {
@@ -19,7 +28,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, data = {} }: HolyricsRequest = await req.json();
+    const { action, data = {}, config }: HolyricsRequest = await req.json();
     console.log('Action requested:', action, 'Data:', data);
 
     // Mapear ações para o formato correto da API do Holyrics
@@ -61,19 +70,44 @@ serve(async (req) => {
         break;
     }
 
-    const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
-    const token = Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
-    
-    const url = `https://api.holyrics.com.br/send/${holyricsAction}`;
-    console.log('Making request to:', url, 'with data:', requestData);
+    // Determine connection mode and build request
+    let url: string;
+    let headers: HeadersInit;
+
+    if (config?.mode === 'local' && config.localHost && config.localPort) {
+      // Local API mode
+      url = `${config.localHost}:${config.localPort}/api/${holyricsAction}?token=${config.token}`;
+      headers = {
+        'Content-Type': 'application/json',
+      };
+      console.log('Using LOCAL API mode:', url);
+    } else if (config?.mode === 'web' && config.apiKey) {
+      // Web Server API mode
+      url = `https://api.holyrics.com.br/send/${holyricsAction}`;
+      headers = {
+        'Content-Type': 'application/json',
+        'api_key': config.apiKey,
+        'token': config.token,
+      };
+      console.log('Using WEB SERVER API mode:', url);
+    } else {
+      // Fallback to env variables (legacy support)
+      const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
+      const token = Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
+      url = `https://api.holyrics.com.br/send/${holyricsAction}`;
+      headers = {
+        'Content-Type': 'application/json',
+        'api_key': api_key,
+        'token': token,
+      };
+      console.log('Using FALLBACK mode (env variables):', url);
+    }
+
+    console.log('Making request with data:', requestData);
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api_key': api_key,
-        'token': token
-      },
+      headers,
       body: JSON.stringify(requestData)
     });
 

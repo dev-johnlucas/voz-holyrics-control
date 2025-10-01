@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, RefreshCw, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { loadConfig, clearConfig } from "@/types/holyrics-config";
 
 interface ConnectionStatusProps {
   isConnected: boolean;
@@ -13,6 +14,7 @@ interface ConnectionStatusProps {
 export const ConnectionStatus = ({ isConnected, onToggleConnection }: ConnectionStatusProps) => {
   const [lastPing, setLastPing] = useState<Date | null>(null);
   const { toast } = useToast();
+  const config = loadConfig();
 
   useEffect(() => {
     if (isConnected) {
@@ -72,23 +74,40 @@ export const ConnectionStatus = ({ isConnected, onToggleConnection }: Connection
               </p>
             )}
             
-            {!isConnected && (
+            {!isConnected && config && (
               <p className="text-xs text-muted-foreground">
-                localhost:5000 - Aguardando conexão
+                {config.mode === 'local' 
+                  ? `${config.localHost}:${config.localPort} - Aguardando conexão`
+                  : 'API Server Web - Aguardando conexão'
+                }
               </p>
             )}
           </div>
         </div>
 
-        <Button
-          onClick={handleToggleConnection}
-          variant={isConnected ? "destructive" : "default"}
-          size="sm"
-          className="min-w-[100px]"
-        >
-          <RefreshCw className="w-4 h-4 mr-2" />
-          {isConnected ? "Desconectar" : "Conectar"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => {
+              clearConfig();
+              window.location.reload();
+            }}
+            variant="outline"
+            size="sm"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Reconfigurar
+          </Button>
+          
+          <Button
+            onClick={handleToggleConnection}
+            variant={isConnected ? "destructive" : "default"}
+            size="sm"
+            className="min-w-[100px]"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            {isConnected ? "Desconectar" : "Conectar"}
+          </Button>
+        </div>
       </div>
     </Card>
   );
