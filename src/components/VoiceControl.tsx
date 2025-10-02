@@ -41,9 +41,9 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       const recognitionInstance = new SpeechRecognition();
       
       recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
+      recognitionInstance.interimResults = false;
       recognitionInstance.lang = 'pt-BR';
-      recognitionInstance.maxAlternatives = 3;
+      recognitionInstance.maxAlternatives = 1;
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
@@ -59,19 +59,8 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];
         if (lastResult.isFinal) {
-          // Pega a alternativa com maior confiança
-          let bestTranscript = lastResult[0].transcript;
-          let bestConfidence = lastResult[0].confidence;
-          
-          for (let i = 1; i < lastResult.length; i++) {
-            if (lastResult[i].confidence > bestConfidence) {
-              bestTranscript = lastResult[i].transcript;
-              bestConfidence = lastResult[i].confidence;
-            }
-          }
-          
-          const transcript = bestTranscript.toLowerCase().trim();
-          console.log('Comando de voz recebido:', transcript, 'Confiança:', bestConfidence);
+          const transcript = lastResult[0].transcript.toLowerCase().trim();
+          console.log('Comando de voz recebido:', transcript);
 
           // 1) Referência bíblica
           const verseReference = parseVerseReference(transcript);
