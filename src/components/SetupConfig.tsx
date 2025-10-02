@@ -55,27 +55,56 @@ export const SetupConfig = ({ onConfigComplete, initialConfig }: SetupConfigProp
         ...(mode === 'web' && { apiKey }),
       };
 
-      // Test connection using edge function
-      const { data, error } = await supabase.functions.invoke('holyrics-control', {
-        body: { 
-          action: 'GetCPInfo',
-          data: {},
-          config
-        }
-      });
+      if (mode === 'local') {
+        // Teste direto na API Local (evita CORS usando no-cors e considera sucesso se não houver erro de rede)
+        const normalizeBase = (host: string, port: number) => {
+          let base = String(host).trim();
+          if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
+          base = base.replace(/\/+$/, '');
+          const hasPort = /:\\d+$/.test(new URL(base).host);
+          if (!hasPort && port) {
+            base = `${base}:${port}`;
+          }
+          return base;
+        };
+        const base = normalizeBase(localHost, parseInt(localPort));
+        const testUrl = `${base}/api/GetCPInfo?token=${encodeURIComponent(token)}`;
 
-      if (error) {
-        throw new Error(error.message || 'Falha na comunicação');
-      }
+        await fetch(testUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+          body: JSON.stringify({}),
+          mode: 'no-cors',
+        });
 
-      if (data) {
         toast({
           title: "Conexão estabelecida!",
-          description: "Configuração salva com sucesso",
+          description: "Configuração salva com sucesso (API Local)",
         });
         onConfigComplete(config);
       } else {
-        throw new Error('Resposta inválida do servidor');
+        // Teste via Edge Function para API Web
+        const { data, error } = await supabase.functions.invoke('holyrics-control', {
+          body: { 
+            action: 'GetCPInfo',
+            data: {},
+            config
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Falha na comunicação');
+        }
+
+        if (data) {
+          toast({
+            title: "Conexão estabelecida!",
+            description: "Configuração salva com sucesso (API Web)",
+          });
+          onConfigComplete(config);
+        } else {
+          throw new Error('Resposta inválida do servidor');
+        }
       }
     } catch (error) {
       console.error('Connection test failed:', error);

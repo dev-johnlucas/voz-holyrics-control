@@ -41,9 +41,9 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       const recognitionInstance = new SpeechRecognition();
       
       recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = false;
+      recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'pt-BR';
-      recognitionInstance.maxAlternatives = 1;
+      recognitionInstance.maxAlternatives = 3;
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
@@ -59,8 +59,19 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];
         if (lastResult.isFinal) {
-          const transcript = lastResult[0].transcript.toLowerCase().trim();
-          console.log('Comando de voz recebido:', transcript);
+          // Pega a alternativa com maior confiança
+          let bestTranscript = lastResult[0].transcript;
+          let bestConfidence = lastResult[0].confidence;
+          
+          for (let i = 1; i < lastResult.length; i++) {
+            if (lastResult[i].confidence > bestConfidence) {
+              bestTranscript = lastResult[i].transcript;
+              bestConfidence = lastResult[i].confidence;
+            }
+          }
+          
+          const transcript = bestTranscript.toLowerCase().trim();
+          console.log('Comando de voz recebido:', transcript, 'Confiança:', bestConfidence);
 
           // 1) Referência bíblica
           const verseReference = parseVerseReference(transcript);
@@ -99,20 +110,18 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
 
       setRecognition(recognitionInstance);
 
-      // Precarregar nomes de imagens do Holyrics
-      (async () => {
-        try {
-          const res = await getImages();
-          const names = Array.isArray(res?.images)
-            ? res.images.map((i: any) => (i.name || '').toLowerCase()).filter((x: string) => !!x)
-            : [];
-          setImageNames(names);
-        } catch (e) {
-          console.warn('Falha ao carregar imagens:', e);
-        }
-      })();
+      // Precarregar nomes de imagens do Holyrics (apenas uma vez)
+      getImages().then((res) => {
+        const names = Array.isArray(res?.images)
+          ? res.images.map((i: any) => (i.name || '').toLowerCase()).filter((x: string) => !!x)
+          : [];
+        setImageNames(names);
+      }).catch((e) => {
+        console.warn('Falha ao carregar imagens:', e);
+      });
     }
-  }, [getImages, onCommand, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleListening = () => {
     if (!recognition) {
