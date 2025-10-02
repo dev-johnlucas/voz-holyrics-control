@@ -29,7 +29,7 @@ serve(async (req) => {
 
   try {
     const { action, data = {}, config }: HolyricsRequest = await req.json();
-    console.log('Action requested:', action);
+    console.log('Action requested:', action, 'Data:', data);
 
     // Mapear ações para o formato correto da API do Holyrics
     let holyricsAction = action;
@@ -80,7 +80,7 @@ serve(async (req) => {
       headers = {
         'Content-Type': 'application/json',
       };
-      console.log('Using LOCAL API mode');
+      console.log('Using LOCAL API mode:', url);
     } else if (config?.mode === 'web' && config.apiKey) {
       // Web Server API mode
       url = `https://api.holyrics.com.br/send/${holyricsAction}`;
@@ -89,7 +89,7 @@ serve(async (req) => {
         'api_key': config.apiKey,
         'token': config.token,
       };
-      console.log('Using WEB SERVER API mode');
+      console.log('Using WEB SERVER API mode:', url);
     } else {
       // Fallback to env variables (legacy support)
       const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
@@ -103,7 +103,7 @@ serve(async (req) => {
       console.log('Using FALLBACK mode (env variables):', url);
     }
 
-    // Making request
+    console.log('Making request with data:', requestData);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -112,6 +112,7 @@ serve(async (req) => {
     });
 
     const result = await response.json();
+    console.log('Holyrics API response:', result);
 
     return new Response(
       JSON.stringify(result),

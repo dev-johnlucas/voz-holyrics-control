@@ -125,15 +125,8 @@ export const HolyricsDashboard = () => {
   const toggleConnection = async () => {
     if (!isConnected) {
       // Test connection with Holyrics
-      toast({
-        title: "Conectando...",
-        description: "Testando conexão com Holyrics",
-      });
-      
       const result = await getCPInfo();
-      console.log('Connection test result:', result);
-      
-      if (result && result.status === 'ok') {
+      if (result) {
         setIsConnected(true);
         setCurrentDisplay("standby");
         toast({
@@ -143,7 +136,7 @@ export const HolyricsDashboard = () => {
       } else {
         toast({
           title: "Falha na conexão",
-          description: "Verifique se o Holyrics está rodando e as configurações estão corretas",
+          description: "Não foi possível conectar ao Holyrics",
           variant: "destructive",
         });
       }

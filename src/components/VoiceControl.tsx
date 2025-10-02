@@ -99,18 +99,20 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
 
       setRecognition(recognitionInstance);
 
-      // Precarregar nomes de imagens do Holyrics (apenas uma vez)
-      getImages().then((res) => {
-        const names = Array.isArray(res?.images)
-          ? res.images.map((i: any) => (i.name || '').toLowerCase()).filter((x: string) => !!x)
-          : [];
-        setImageNames(names);
-      }).catch((e) => {
-        console.warn('Falha ao carregar imagens:', e);
-      });
+      // Precarregar nomes de imagens do Holyrics
+      (async () => {
+        try {
+          const res = await getImages();
+          const names = Array.isArray(res?.images)
+            ? res.images.map((i: any) => (i.name || '').toLowerCase()).filter((x: string) => !!x)
+            : [];
+          setImageNames(names);
+        } catch (e) {
+          console.warn('Falha ao carregar imagens:', e);
+        }
+      })();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [getImages, onCommand, toast]);
 
   const toggleListening = () => {
     if (!recognition) {

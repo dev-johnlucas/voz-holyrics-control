@@ -12,7 +12,7 @@ export const useHolyricsAPI = () => {
 
   const callHolyricsAPI = async (action: string, data?: Record<string, any>) => {
     try {
-      // Calling Holyrics API (details omitted for security)
+      console.log('Calling Holyrics API:', action, data);
       
       const config = getConfig();
       if (!config) {
@@ -27,30 +27,20 @@ export const useHolyricsAPI = () => {
       // For local mode, try direct connection first
       if (config.mode === 'local' && config.localHost && config.localPort) {
         try {
-          const normalizeBase = (host: string, port: number) => {
-            let base = String(host).trim();
-            if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
-            // remove trailing slashes
-            base = base.replace(/\/+$/, '');
-            // if base already has a port, don't append
-            const hasPort = /:\\d+$/.test(new URL(base).host);
-            if (!hasPort && port) {
-              base = `${base}:${port}`;
-            }
-            return base;
-          };
-
-          const base = normalizeBase(config.localHost, config.localPort);
-          const localUrl = `${base}/api/${action}?token=${encodeURIComponent(config.token)}`;
-
-          await fetch(localUrl, {
+          const localUrl = `${config.localHost}:${config.localPort}/api/${action}?token=${config.token}`;
+          console.log('Trying local connection:', localUrl);
+          
+          const response = await fetch(localUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+            headers: {
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify(data || {}),
             mode: 'no-cors', // Required for localhost cross-origin requests
           });
 
           // With no-cors, we can't read the response, but if no error was thrown, assume success
+          console.log('Local connection successful');
           return { status: 'ok' };
         } catch (localError) {
           console.warn('Local connection failed, falling back to edge function:', localError);
