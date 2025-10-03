@@ -89,9 +89,79 @@ const normalizeOrdinals = (s: string) =>
     .replace(/segund[oa]/g, "2")
     .replace(/terceir[oa]/g, "3");
 
+// Converte números por extenso em PT-BR (até 199) para dígitos dentro do texto normalizado
+const wordsToDigitsInText = (s: string) => {
+  const units: Record<string, number> = {
+    'zero': 0, 'um': 1, 'uma': 1, 'dois': 2, 'duas': 2, 'tres': 3, 'quatro': 4,
+    'cinco': 5, 'seis': 6, 'sete': 7, 'oito': 8, 'nove': 9
+  };
+  const teens: Record<string, number> = {
+    'dez': 10, 'onze': 11, 'doze': 12, 'treze': 13, 'catorze': 14, 'quatorze': 14,
+    'quinze': 15, 'dezesseis': 16, 'dezessete': 17, 'dezoito': 18, 'dezenove': 19
+  };
+  const tens: Record<string, number> = {
+    'vinte': 20, 'trinta': 30, 'quarenta': 40, 'cinquenta': 50,
+    'sessenta': 60, 'setenta': 70, 'oitenta': 80, 'noventa': 90
+  };
+
+  const parseNumberWords = (tokens: string[], start: number): { value: number; length: number } => {
+    let i = start;
+    let value = 0;
+    let consumed = 0;
+    let matched = false;
+
+    // centenas simples suportadas
+    if (tokens[i] === 'cem') {
+      return { value: 100, length: 1 };
+    }
+    if (tokens[i] === 'cento') {
+      value = 100;
+      i += 1; consumed += 1; matched = true;
+      if (tokens[i] === 'e') { i += 1; consumed += 1; }
+    }
+
+    // teens (10-19) tem prioridade sobre dez + unidade
+    if (teens[tokens[i]]) {
+      value += teens[tokens[i]];
+      consumed += 1; matched = true;
+      return { value, length: consumed };
+    }
+
+    // dezenas (20-90) possivelmente seguidas de "e" + unidade
+    if (tens[tokens[i]]) {
+      value += tens[tokens[i]]; i += 1; consumed += 1; matched = true;
+      if (tokens[i] === 'e') { i += 1; consumed += 1; }
+      if (units[tokens[i]] !== undefined) { value += units[tokens[i]]; consumed += 1; }
+      return { value, length: consumed };
+    }
+
+    // unidade isolada
+    if (units[tokens[i]] !== undefined) {
+      value += units[tokens[i]]; consumed += 1; matched = true;
+      return { value, length: consumed };
+    }
+
+    return { value: 0, length: 0 };
+  };
+
+  const tokens = s.split(' ');
+  const out: string[] = [];
+  for (let i = 0; i < tokens.length; ) {
+    const { value, length } = parseNumberWords(tokens, i);
+    if (length > 0) {
+      out.push(String(value));
+      i += length;
+    } else {
+      out.push(tokens[i]);
+      i += 1;
+    }
+  }
+  return out.join(' ');
+};
+
 export const parseBibleReferencePT = (input: string): string | null => {
   if (!input) return null;
-  const text = normalizeOrdinals(normalize(input));
+  const text = wordsToDigitsInText(normalizeOrdinals(normalize(input)));
 
   // Try to find a book key (longest first)
   const keys = Object.keys(booksPT).sort((a, b) => b.length - a.length);
@@ -114,7 +184,7 @@ export const parseBibleReferencePT = (input: string): string | null => {
 
   // Look for chapter and verse numbers after the matched book name
   const rest = text.slice(idx).trim();
-  // Accept patterns like: 3:16, 3 16, cap 3 vers 16, capítulo 3 versículo 16
+  // Accept patterns like: 3:16, 3 16, cap 3 vers 16, capítulo 3 versículo 16 (após conversão de números por extenso)
   const numMatch = rest.match(/(\d{1,3})\D+(\d{1,3})/);
   if (!numMatch) return null;
 

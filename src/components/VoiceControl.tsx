@@ -31,6 +31,24 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
     "igreja",
   ];
 
+  // Normaliza texto para comparação robusta (sem acentos)
+  const normalizeText = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s:]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  // Conjuntos de palavras-chave para comandos básicos
+  const commandMatchers = {
+    open: ['abrir biblia', 'abrir a biblia', 'mostrar biblia', 'mostrar a biblia'],
+    close: ['fechar biblia', 'fechar a biblia', 'ocultar biblia', 'ocultar a biblia'],
+    next: ['proximo versiculo', 'proximo verso', 'proximo'],
+    prev: ['versiculo anterior', 'voltar versiculo', 'anterior']
+  } as const;
+
   const parseVerseReference = (text: string): string | null => {
     return parseBibleReferencePT(text);
   };
@@ -41,9 +59,9 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
       const recognitionInstance = new SpeechRecognition();
       
       recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = false;
+      recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'pt-BR';
-      recognitionInstance.maxAlternatives = 1;
+      recognitionInstance.maxAlternatives = 5;
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
@@ -58,35 +76,58 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
 
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];
-        if (lastResult.isFinal) {
-          const transcript = lastResult[0].transcript.toLowerCase().trim();
-          console.log('Comando de voz recebido:', transcript);
+        // Use a melhor alternativa com maior confiança
+        const alts: { transcript: string; confidence: number }[] = [];
+        for (let i = 0; i < lastResult.length; i++) {
+          alts.push({ transcript: lastResult[i].transcript, confidence: lastResult[i].confidence ?? 0 });
+        }
+        const best = alts.sort((a, b) => (b.confidence - a.confidence))[0] ?? { transcript: '', confidence: 0 };
+        const transcriptRaw = best.transcript.toLowerCase().trim();
+        const tNorm = normalizeText(transcriptRaw);
 
-          // 1) Referência bíblica
-          const verseReference = parseVerseReference(transcript);
+        if (lastResult.isFinal) {
+          console.log('Comando de voz recebido:', transcriptRaw);
+
+          // 1) Referência bíblica (aceita números por extenso via util)
+          const verseReference = parseVerseReference(transcriptRaw);
           if (verseReference) {
-            toast({
-              title: "Referência bíblica reconhecida",
-              description: `Abrindo ${verseReference}`,
-            });
-            onCommand(`verse:${verseReference}`);
+            toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
+            // Garantir que a Bíblia esteja aberta antes de enviar o versículo
+            onCommand('abrir bíblia');
+            setTimeout(() => onCommand(`verse:${verseReference}`), 250);
             return;
           }
 
-          // 2) Imagens por voz (inclui "tema principal")
-          const t = transcript;
-          const matchedImage = imageNames.find((n) => t.includes(n));
-          if (matchedImage || t.includes('tema principal')) {
+          // 2) Imagens por voz (normaliza para bater independentemente de acentos)
+          const matchedImage = imageNames.find((n) => tNorm.includes(normalizeText(n)));
+          if (matchedImage || tNorm.includes('tema principal')) {
             const name = matchedImage ?? 'tema principal';
             toast({ title: 'Imagem reconhecida', description: `Exibindo "${name}"` });
             onCommand(`image:${name}`);
             return;
           }
 
-          // 3) Comandos básicos
-          if (commands.some(cmd => transcript.includes(cmd))) {
-            onCommand(transcript);
-            toast({ title: "Comando reconhecido", description: `"${transcript}"` });
+          // 3) Comandos básicos (open/close/next/prev) com sinônimos
+          const hasAny = (list: readonly string[]) => list.some((k) => tNorm.includes(k));
+          if (hasAny(commandMatchers.open)) {
+            onCommand('abrir bíblia');
+            toast({ title: 'Comando', description: 'Abrindo Bíblia' });
+            return;
+          }
+          if (hasAny(commandMatchers.close)) {
+            onCommand('fechar bíblia');
+            toast({ title: 'Comando', description: 'Fechando Bíblia' });
+            return;
+          }
+          if (hasAny(commandMatchers.next)) {
+            onCommand('próximo versículo');
+            toast({ title: 'Comando', description: 'Próximo versículo' });
+            return;
+          }
+          if (hasAny(commandMatchers.prev)) {
+            onCommand('versículo anterior');
+            toast({ title: 'Comando', description: 'Versículo anterior' });
+            return;
           }
         }
       };
