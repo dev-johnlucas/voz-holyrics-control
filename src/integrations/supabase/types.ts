@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_holyrics_configs: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          id: string
+          local_host: string | null
+          local_port: number | null
+          mode: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          local_host?: string | null
+          local_port?: number | null
+          mode: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          id?: string
+          local_host?: string | null
+          local_port?: number | null
+          mode?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

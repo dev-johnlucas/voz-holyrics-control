@@ -1,76 +1,44 @@
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { loadConfig } from "@/types/holyrics-config";
+import { toast } from "@/hooks/use-toast";
 import type { HolyricsConfig } from "@/types/holyrics-config";
 
 export const useHolyricsAPI = () => {
-  const { toast } = useToast();
-
-  const getConfig = (): HolyricsConfig | null => {
-    return loadConfig();
-  };
-
   const callHolyricsAPI = async (action: string, data?: Record<string, any>) => {
     try {
-      // Calling Holyrics API (details omitted for security)
-      
-      const config = getConfig();
-      if (!config) {
+      console.log(`Calling Holyrics API: ${action}`, data);
+
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         toast({
-          title: "Configuração necessária",
-          description: "Configure a conexão com o Holyrics primeiro",
+          title: "Não autenticado",
+          description: "Por favor, faça login para continuar",
           variant: "destructive",
         });
         return null;
       }
 
-      // For local mode, try direct connection first
-      if (config.mode === 'local' && config.localHost && config.localPort) {
-        try {
-          const normalizeBase = (host: string, port: number) => {
-            let base = String(host).trim();
-            if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
-            // remove trailing slashes
-            base = base.replace(/\/+$/, '');
-            // if base already has a port, don't append
-            const hasPort = /:\\d+$/.test(new URL(base).host);
-            if (!hasPort && port) {
-              base = `${base}:${port}`;
-            }
-            return base;
-          };
-
-          const base = normalizeBase(config.localHost, config.localPort);
-          const localUrl = `${base}/api/${action}?token=${encodeURIComponent(config.token)}`;
-
-          await fetch(localUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-            body: JSON.stringify(data || {}),
-            mode: 'no-cors', // Required for localhost cross-origin requests
-          });
-
-          // With no-cors, we can't read the response, but if no error was thrown, assume success
-          return { status: 'ok' };
-        } catch (localError) {
-          console.warn('Local connection failed, falling back to edge function:', localError);
-        }
-      }
-
-      // Fallback to edge function (works for both modes)
+      // Call edge function with authentication
       const { data: result, error } = await supabase.functions.invoke('holyrics-control', {
-        body: { 
-          action, 
-          data,
-          config // Pass config to edge function
-        }
+        body: { action, data }
       });
 
       if (error) {
-        console.error('Supabase function error:', error);
+        console.error('Edge function error:', error);
         toast({
-          title: "Erro de comunicação",
-          description: "Falha ao comunicar com o Holyrics",
+          title: "Erro ao comunicar com Holyrics",
+          description: error.message || "Verifique sua conexão e configuração",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      console.log('Holyrics API response:', result);
+
+      if (result?.status === 'error') {
+        toast({
+          title: "Erro do Holyrics",
+          description: result.error?.message || "Erro desconhecido",
           variant: "destructive",
         });
         return null;
@@ -81,7 +49,7 @@ export const useHolyricsAPI = () => {
       console.error('Error calling Holyrics API:', error);
       toast({
         title: "Erro",
-        description: "Falha na requisição para o Holyrics",
+        description: "Falha ao comunicar com o servidor",
         variant: "destructive",
       });
       return null;
@@ -95,12 +63,10 @@ export const useHolyricsAPI = () => {
   const showImage = (imageName: string) => callHolyricsAPI('ShowImage', { name: imageName });
   const getCPInfo = () => callHolyricsAPI('GetCPInfo');
   const getImages = () => callHolyricsAPI('GetImages');
-  
-  // Funções adicionais baseadas na documentação oficial
   const showVerse = (reference: string) => callHolyricsAPI('ShowVerse', { references: reference });
-  const toggleF8 = () => callHolyricsAPI('ToggleF8'); // Papel de parede
-  const toggleF9 = () => callHolyricsAPI('ToggleF9'); // Tela vazia
-  const toggleF10 = () => callHolyricsAPI('ToggleF10'); // Tela preta
+  const toggleF8 = () => callHolyricsAPI('ToggleF8');
+  const toggleF9 = () => callHolyricsAPI('ToggleF9');
+  const toggleF10 = () => callHolyricsAPI('ToggleF10');
 
   return {
     callHolyricsAPI,
@@ -109,11 +75,11 @@ export const useHolyricsAPI = () => {
     nextVerse,
     previousVerse,
     showImage,
-    showVerse,
     getCPInfo,
     getImages,
+    showVerse,
     toggleF8,
     toggleF9,
-    toggleF10
+    toggleF10,
   };
 };

@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { Settings, Loader2, Wifi, Globe } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { HolyricsConfig, ConnectionMode } from "@/types/holyrics-config";
+import type { HolyricsConfig } from "@/types/holyrics-config";
 
 interface SetupConfigProps {
   onConfigComplete: (config: HolyricsConfig) => void;
@@ -15,233 +14,292 @@ interface SetupConfigProps {
 }
 
 export const SetupConfig = ({ onConfigComplete, initialConfig }: SetupConfigProps) => {
-  const [mode, setMode] = useState<ConnectionMode>(initialConfig?.mode || 'local');
+  const [mode, setMode] = useState<'local' | 'web'>(initialConfig?.mode || 'web');
   const [localHost, setLocalHost] = useState(initialConfig?.localHost || 'http://localhost');
   const [localPort, setLocalPort] = useState(initialConfig?.localPort?.toString() || '8080');
-  const [token, setToken] = useState(initialConfig?.token || '');
   const [apiKey, setApiKey] = useState(initialConfig?.apiKey || '');
-  const [testing, setTesting] = useState(false);
-  const { toast } = useToast();
+  const [token, setToken] = useState(initialConfig?.token || '');
+  const [isTesting, setIsTesting] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSigningUp, setIsSigningUp] = useState(false);
+
+  const handleAuth = async (isSignUp: boolean) => {
+    try {
+      setIsTesting(true);
+      
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Conta criada!",
+          description: "Verifique seu email para confirmar o cadastro.",
+        });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (error) throw error;
+        
+        toast({
+          title: "Login realizado!",
+          description: "Agora você pode configurar sua conexão.",
+        });
+        
+        setNeedsAuth(false);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro na autenticação",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const testConnection = async () => {
-    if (mode === 'local' && (!localHost || !localPort || !token)) {
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      setNeedsAuth(true);
       toast({
-        title: "Campos obrigatórios",
-        description: "Preencha Host, Porta e Token",
+        title: "Autenticação necessária",
+        description: "Por favor, faça login ou crie uma conta para continuar.",
         variant: "destructive",
       });
       return;
     }
 
-    if (mode === 'web' && (!apiKey || !token)) {
+    // Validar campos
+    if (!token) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Preencha API Key e Token",
+        title: "Token obrigatório",
+        description: "Por favor, preencha o token",
         variant: "destructive",
       });
       return;
     }
 
-    setTesting(true);
+    if (mode === 'web' && !apiKey) {
+      toast({
+        title: "API Key obrigatória",
+        description: "Por favor, preencha a API Key para o modo Web",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (mode === 'local' && (!localHost || !localPort)) {
+      toast({
+        title: "Host e Porta obrigatórios",
+        description: "Por favor, preencha o host e porta para o modo Local",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsTesting(true);
 
     try {
       const config: HolyricsConfig = {
         mode,
+        localHost: mode === 'local' ? localHost : undefined,
+        localPort: mode === 'local' ? parseInt(localPort) : undefined,
         token,
-        ...(mode === 'local' && {
-          localHost,
-          localPort: parseInt(localPort),
-        }),
-        ...(mode === 'web' && { apiKey }),
+        apiKey: mode === 'web' ? apiKey : undefined,
       };
 
-      if (mode === 'local') {
-        // Teste direto na API Local (evita CORS usando no-cors e considera sucesso se não houver erro de rede)
-        const normalizeBase = (host: string, port: number) => {
-          let base = String(host).trim();
-          if (!/^https?:\/\//i.test(base)) base = `http://${base}`;
-          base = base.replace(/\/+$/, '');
-          const hasPort = /:\\d+$/.test(new URL(base).host);
-          if (!hasPort && port) {
-            base = `${base}:${port}`;
-          }
-          return base;
-        };
-        const base = normalizeBase(localHost, parseInt(localPort));
-        const testUrl = `${base}/api/GetCPInfo?token=${encodeURIComponent(token)}`;
-
-        await fetch(testUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-          body: JSON.stringify({}),
-          mode: 'no-cors',
+      // Save config to database
+      const { error: upsertError } = await supabase
+        .from('user_holyrics_configs')
+        .upsert({
+          user_id: user.id,
+          mode: config.mode,
+          local_host: config.localHost,
+          local_port: config.localPort,
+          token: config.token,
+          api_key: config.apiKey,
         });
 
-        toast({
-          title: "Conexão estabelecida!",
-          description: "Configuração salva com sucesso (API Local)",
-        });
-        onConfigComplete(config);
-      } else {
-        // Teste via Edge Function para API Web
-        const { data, error } = await supabase.functions.invoke('holyrics-control', {
-          body: { 
-            action: 'GetCPInfo',
-            data: {},
-            config
-          }
-        });
-
-        if (error) {
-          throw new Error(error.message || 'Falha na comunicação');
-        }
-
-        if (data) {
-          toast({
-            title: "Conexão estabelecida!",
-            description: "Configuração salva com sucesso (API Web)",
-          });
-          onConfigComplete(config);
-        } else {
-          throw new Error('Resposta inválida do servidor');
-        }
+      if (upsertError) {
+        console.error('Error saving config:', upsertError);
+        throw new Error('Falha ao salvar configuração: ' + upsertError.message);
       }
-    } catch (error) {
+
+      // Test connection
+      const { data, error } = await supabase.functions.invoke('holyrics-control', {
+        body: { 
+          action: 'GetCPInfo',
+          data: {}
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Erro ao conectar');
+      }
+
+      if (data?.status === 'error') {
+        throw new Error(data.error?.message || 'Erro desconhecido do Holyrics');
+      }
+
+      toast({
+        title: "Conexão estabelecida!",
+        description: "Configuração salva com sucesso",
+      });
+
+      onConfigComplete(config);
+    } catch (error: any) {
       console.error('Connection test failed:', error);
       toast({
         title: "Falha na conexão",
-        description: error instanceof Error ? error.message : "Verifique as configurações e se o Holyrics está rodando",
+        description: error.message || "Verifique suas credenciais e tente novamente",
         variant: "destructive",
       });
     } finally {
-      setTesting(false);
+      setIsTesting(false);
     }
   };
 
+  if (needsAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Autenticação</CardTitle>
+            <CardDescription>
+              {isSigningUp ? 'Crie sua conta' : 'Entre com sua conta'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleAuth(isSigningUp)} 
+                disabled={isTesting}
+                className="flex-1"
+              >
+                {isTesting ? "Processando..." : isSigningUp ? "Criar Conta" : "Entrar"}
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setIsSigningUp(!isSigningUp)}
+                className="flex-1"
+              >
+                {isSigningUp ? "Já tenho conta" : "Criar conta"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <Card className="w-full max-w-2xl p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <Settings className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Configuração do Holyrics</h1>
-            <p className="text-muted-foreground mt-1">
-              Configure a conexão com sua API do Holyrics
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle>Configuração do Holyrics</CardTitle>
+          <CardDescription>
+            Configure a conexão com o Holyrics. Escolha entre API Local ou API Server Web.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'local' | 'web')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="local">API Local</TabsTrigger>
+              <TabsTrigger value="web">API Server Web</TabsTrigger>
+            </TabsList>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as ConnectionMode)} className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="local" className="flex items-center gap-2">
-              <Wifi className="w-4 h-4" />
-              API Local
-            </TabsTrigger>
-            <TabsTrigger value="web" className="flex items-center gap-2">
-              <Globe className="w-4 h-4" />
-              API Server Web
-            </TabsTrigger>
-          </TabsList>
+            <TabsContent value="local" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="localHost">Host</Label>
+                <Input
+                  id="localHost"
+                  placeholder="http://localhost"
+                  value={localHost}
+                  onChange={(e) => setLocalHost(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="localPort">Porta</Label>
+                <Input
+                  id="localPort"
+                  placeholder="8080"
+                  value={localPort}
+                  onChange={(e) => setLocalPort(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="localToken">Token</Label>
+                <Input
+                  id="localToken"
+                  placeholder="Seu token do Holyrics"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </div>
+            </TabsContent>
 
-          <TabsContent value="local" className="space-y-4 mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="localHost">Host / Endereço IP</Label>
-              <Input
-                id="localHost"
-                placeholder="http://localhost ou http://192.168.1.x"
-                value={localHost}
-                onChange={(e) => setLocalHost(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Exemplo: http://localhost ou http://192.168.1.100
-              </p>
-            </div>
+            <TabsContent value="web" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">API Key</Label>
+                <Input
+                  id="apiKey"
+                  placeholder="Sua API Key do Holyrics"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="webToken">Token</Label>
+                <Input
+                  id="webToken"
+                  placeholder="Seu token do Holyrics"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
 
-            <div className="space-y-2">
-              <Label htmlFor="localPort">Porta</Label>
-              <Input
-                id="localPort"
-                placeholder="8080"
-                type="number"
-                value={localPort}
-                onChange={(e) => setLocalPort(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Porta configurada no Holyrics (padrão: 8080)
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="localToken">Token de Acesso</Label>
-              <Input
-                id="localToken"
-                placeholder="Token da API Local"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Token criado em: Menu arquivo → Configurações → API Server → Gerenciar permissões
-              </p>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="web" className="space-y-4 mt-6">
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                placeholder="Sua API Key do Holyrics"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                API Key disponível em: Menu arquivo → Configurações → API Server
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="webToken">Token de Acesso</Label>
-              <Input
-                id="webToken"
-                placeholder="Token da API Server Web"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Token criado em: Menu arquivo → Configurações → API Server → Gerenciar permissões
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <div className="mt-8 flex gap-3">
-          <Button
-            onClick={testConnection}
-            disabled={testing}
-            className="flex-1"
-            size="lg"
+          <Button 
+            onClick={testConnection} 
+            disabled={isTesting}
+            className="w-full mt-6"
           >
-            {testing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Testando conexão...
-              </>
-            ) : (
-              <>
-                <Wifi className="w-4 h-4 mr-2" />
-                Testar e Conectar
-              </>
-            )}
+            {isTesting ? "Testando conexão..." : "Testar e Conectar"}
           </Button>
-        </div>
-
-        <div className="mt-6 p-4 bg-muted rounded-lg">
-          <h3 className="font-medium mb-2">ℹ️ Sobre os modos de conexão</h3>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>• <strong>API Local:</strong> Conexão direta na rede local (mais rápida)</li>
-            <li>• <strong>API Server Web:</strong> Conexão pela internet (funciona remotamente)</li>
-          </ul>
-        </div>
+        </CardContent>
       </Card>
     </div>
   );

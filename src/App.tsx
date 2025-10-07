@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,11 +18,42 @@ const App = () => {
   const [isConfigured, setIsConfigured] = useState(false);
 
   useEffect(() => {
-    const savedConfig = loadConfig();
-    if (savedConfig) {
-      setConfig(savedConfig);
-      setIsConfigured(true);
-    }
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setIsConfigured(false);
+        return;
+      }
+
+      // Try to load config from database
+      const { data: configData } = await supabase
+        .from('user_holyrics_configs')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (configData) {
+        const loadedConfig: HolyricsConfig = {
+          mode: configData.mode as 'local' | 'web',
+          localHost: configData.local_host,
+          localPort: configData.local_port,
+          token: configData.token,
+          apiKey: configData.api_key,
+        };
+        setConfig(loadedConfig);
+        setIsConfigured(true);
+      } else {
+        // Fallback to localStorage
+        const savedConfig = loadConfig();
+        if (savedConfig) {
+          setConfig(savedConfig);
+          setIsConfigured(true);
+        }
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const handleConfigComplete = (newConfig: HolyricsConfig) => {

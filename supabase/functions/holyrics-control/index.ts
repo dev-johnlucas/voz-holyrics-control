@@ -1,22 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface HolyricsConfig {
-  mode: 'local' | 'web';
-  localHost?: string;
-  localPort?: number;
-  token: string;
-  apiKey?: string;
-}
-
 interface HolyricsRequest {
   action: string;
   data?: Record<string, any>;
-  config?: HolyricsConfig;
 }
 
 serve(async (req) => {
@@ -28,8 +20,58 @@ serve(async (req) => {
   }
 
   try {
-    const { action, data = {}, config }: HolyricsRequest = await req.json();
-    console.log('Action requested:', action);
+    // Validate JWT and get user ID
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with user's JWT
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
+
+    // Verify user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('User authentication failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    // Get user's Holyrics configuration from database
+    const { data: configData, error: configError } = await supabase
+      .from('user_holyrics_configs')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (configError || !configData) {
+      console.error('Config not found for user:', configError);
+      return new Response(
+        JSON.stringify({ error: 'Configuration not found. Please configure your Holyrics connection first.' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('User config loaded:', configData.mode);
+
+    const { action, data = {} }: HolyricsRequest = await req.json();
+    console.log('Action requested:', action, 'by user:', user.id);
 
     // Mapear ações para o formato correto da API do Holyrics
     let holyricsAction = action;
@@ -38,7 +80,7 @@ serve(async (req) => {
     switch (action) {
       case 'OpenBible':
         holyricsAction = 'ShowVerse';
-        requestData = { references: 'João 3:16' }; // Versículo padrão
+        requestData = { references: 'João 3:16' };
         break;
       case 'CloseBible':
         holyricsAction = 'CloseCurrentPresentation';
@@ -74,37 +116,32 @@ serve(async (req) => {
     let url: string;
     let headers: HeadersInit;
 
-    if (config?.mode === 'local' && config.localHost && config.localPort) {
+    if (configData.mode === 'local' && configData.local_host && configData.local_port) {
       // Local API mode
-      url = `${config.localHost}:${config.localPort}/api/${holyricsAction}?token=${config.token}`;
+      url = `${configData.local_host}:${configData.local_port}/api/${holyricsAction}?token=${configData.token}`;
       headers = {
         'Content-Type': 'application/json',
       };
       console.log('Using LOCAL API mode');
-    } else if (config?.mode === 'web' && config.apiKey) {
+    } else if (configData.mode === 'web' && configData.api_key) {
       // Web Server API mode
       url = `https://api.holyrics.com.br/send/${holyricsAction}`;
       headers = {
         'Content-Type': 'application/json',
-        'api_key': config.apiKey,
-        'token': config.token,
+        'api_key': configData.api_key,
+        'token': configData.token,
       };
       console.log('Using WEB SERVER API mode');
     } else {
-      // Fallback to env variables (legacy support)
-      const api_key = Deno.env.get('HOLYRICS_API_KEY') || 'API_KEY';
-      const token = Deno.env.get('HOLYRICS_TOKEN') || 'd87EsX3MALpldAJr';
-      url = `https://api.holyrics.com.br/send/${holyricsAction}`;
-      headers = {
-        'Content-Type': 'application/json',
-        'api_key': api_key,
-        'token': token,
-      };
-      console.log('Using FALLBACK mode (env variables):', url);
+      console.error('Invalid configuration mode');
+      return new Response(
+        JSON.stringify({ error: 'Invalid configuration' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Making request
-
+    // Making request to Holyrics API
+    console.log('Calling Holyrics API:', holyricsAction);
     const response = await fetch(url, {
       method: 'POST',
       headers,
@@ -112,6 +149,7 @@ serve(async (req) => {
     });
 
     const result = await response.json();
+    console.log('Holyrics API response status:', response.status);
 
     return new Response(
       JSON.stringify(result),
@@ -123,8 +161,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error calling Holyrics API:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Failed to communicate with Holyrics API' }),
+      JSON.stringify({ error: 'Failed to communicate with Holyrics API', details: errorMessage }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
