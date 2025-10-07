@@ -188,7 +188,7 @@ export const HolyricsDashboard = () => {
 
           {/* Controls Sidebar */}
           <div className="space-y-6">
-            <VoiceControl onCommand={handleCommand} />
+            <VoiceControl onCommand={handleCommand} isConnected={isConnected} />
             <ControlButtons 
               onCommand={handleCommand}
               isConnected={isConnected}

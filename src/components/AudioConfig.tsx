@@ -17,10 +17,9 @@ export const AudioConfig = () => {
 
   // Monitorar nível de áudio
   useEffect(() => {
-    let mediaRecorder: MediaRecorder | null = null;
     let audioContext: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
-    let dataArray: Uint8Array | null = null;
+    let animationFrameId: number | null = null;
 
     const startAudioMonitoring = async () => {
       try {
@@ -40,17 +39,17 @@ export const AudioConfig = () => {
 
         analyser.fftSize = 256;
         const bufferLength = analyser.frequencyBinCount;
-        dataArray = new Uint8Array(bufferLength);
+        const dataArray = new Uint8Array(bufferLength);
 
         const updateAudioLevel = () => {
-          if (analyser && dataArray) {
+          if (analyser) {
             analyser.getByteFrequencyData(dataArray);
-            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const average = Array.from(dataArray).reduce((a, b) => a + b) / dataArray.length;
             const level = Math.round((average / 255) * 100);
             setAudioLevel(level);
           }
           if (isListening) {
-            requestAnimationFrame(updateAudioLevel);
+            animationFrameId = requestAnimationFrame(updateAudioLevel);
           }
         };
 
@@ -70,6 +69,9 @@ export const AudioConfig = () => {
     }
 
     return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId);
+      }
       if (audioContext) {
         audioContext.close();
       }

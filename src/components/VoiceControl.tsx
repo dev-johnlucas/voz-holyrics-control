@@ -8,9 +8,10 @@ import { parseBibleReferencePT } from "@/lib/bible";
 
 interface VoiceControlProps {
   onCommand: (command: string) => void;
+  isConnected?: boolean;
 }
 
-export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
+export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProps) => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const listeningRef = useRef(false);
@@ -156,6 +157,15 @@ export const VoiceControl = ({ onCommand }: VoiceControlProps) => {
   const toggleListening = () => {
     if (!recognition) {
       toast({ title: "Reconhecimento não suportado", description: "Use os botões de controle", variant: "destructive" });
+      return;
+    }
+
+    if (!isConnected) {
+      toast({ 
+        title: "Sem conexão", 
+        description: "Conecte-se ao Holyrics primeiro para usar comandos de voz",
+        variant: "destructive" 
+      });
       return;
     }
 
