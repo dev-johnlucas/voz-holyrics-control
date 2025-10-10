@@ -44,10 +44,23 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
 
   // Conjuntos de palavras-chave para comandos básicos
   const commandMatchers = {
-    open: ['abrir biblia', 'abrir a biblia', 'mostrar biblia', 'mostrar a biblia'],
-    close: ['fechar biblia', 'fechar a biblia', 'ocultar biblia', 'ocultar a biblia'],
-    next: ['proximo versiculo', 'proximo verso', 'proximo'],
-    prev: ['versiculo anterior', 'voltar versiculo', 'anterior']
+    open: [
+      'abrir biblia', 'abrir a biblia', 'mostrar biblia', 'mostrar a biblia',
+      'exibir biblia', 'exibir a biblia', 'abra biblia', 'abra a biblia',
+      'abrir palavra', 'abrir a palavra', 'abrir escritura', 'abrir as escrituras'
+    ],
+    close: [
+      'fechar biblia', 'fechar a biblia', 'ocultar biblia', 'ocultar a biblia',
+      'esconder biblia', 'esconder a biblia', 'feche biblia', 'feche a biblia'
+    ],
+    next: [
+      'proximo versiculo', 'proximo verso', 'proximo', 'avancar', 'avanca',
+      'ir para o proximo', 'ir pro proximo'
+    ],
+    prev: [
+      'versiculo anterior', 'voltar versiculo', 'anterior', 'voltar', 'retroceder',
+      'verso anterior'
+    ],
   } as const;
 
   const parseVerseReference = (text: string): string | null => {
@@ -60,9 +73,9 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       const recognitionInstance = new SpeechRecognition();
       
       recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
+      recognitionInstance.interimResults = false; // Mudado para evitar comandos duplicados
       recognitionInstance.lang = 'pt-BR';
-      recognitionInstance.maxAlternatives = 5;
+      recognitionInstance.maxAlternatives = 3; // Reduzido para melhor precisão
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
@@ -108,8 +121,16 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
             return;
           }
 
-          // 3) Comandos básicos (open/close/next/prev) com sinônimos
+          // 3) Comandos básicos (open/close/next/prev) com sinônimos + heurísticas
           const hasAny = (list: readonly string[]) => list.some((k) => tNorm.includes(k));
+
+          // Heurística: mencionar "biblia" sem termos de fechamento => abrir
+          if (tNorm.includes('biblia') && !tNorm.includes('fechar') && !tNorm.includes('ocultar')) {
+            onCommand('abrir bíblia');
+            toast({ title: 'Comando', description: 'Abrindo Bíblia' });
+            return;
+          }
+
           if (hasAny(commandMatchers.open)) {
             onCommand('abrir bíblia');
             toast({ title: 'Comando', description: 'Abrindo Bíblia' });
@@ -136,8 +157,21 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       recognitionInstance.onerror = (event: any) => {
         console.error('Erro de reconhecimento de voz:', event.error, event);
         
-        // Ignorar erro "no-speech" e "aborted" (são normais)
-        if (event.error === 'no-speech' || event.error === 'aborted') {
+        if (event.error === 'no-speech') {
+          // Silêncio: apenas reinicia se estivermos escutando
+          if (listeningRef.current) {
+            try {
+              recognitionInstance.stop();
+            } catch {}
+            try {
+              recognitionInstance.start();
+            } catch {}
+          }
+          return;
+        }
+        
+        if (event.error === 'aborted') {
+          // Evento normal quando paramos manualmente
           return;
         }
         
@@ -182,7 +216,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     if (!recognition) {
       toast({ title: "Reconhecimento não suportado", description: "Use os botões de controle", variant: "destructive" });
       return;
@@ -202,9 +236,24 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       setIsListening(false);
       listeningRef.current = false;
     } else {
+      // Aquecer microfone para melhorar captação e pedir permissão
+      try {
+        await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
+        });
+      } catch (e) {
+        toast({
+          title: 'Sem acesso ao microfone',
+          description: 'Conceda permissão ao microfone no navegador',
+          variant: 'destructive'
+        });
+        return;
+      }
+
       try { recognition.start(); } catch {}
       setIsListening(true);
       listeningRef.current = true;
+      toast({ title: 'Escutando', description: 'Fale um comando como "Abrir Bíblia"' });
     }
   };
 
