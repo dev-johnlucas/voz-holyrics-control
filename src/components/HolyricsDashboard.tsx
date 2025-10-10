@@ -14,7 +14,16 @@ export const HolyricsDashboard = () => {
   const [lastCommand, setLastCommand] = useState("");
   const { toast } = useToast();
   const { openBible, closeBible, nextVerse, previousVerse, showImage, showVerse, getCPInfo } = useHolyricsAPI();
-
+  
+  // Normaliza texto para comparar comandos sem acentos e variações simples
+  const normalizeText = (s: string) => s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
   const handleImageSelect = async (imageName: string) => {
     const result = await showImage(imageName);
     if (result) {
@@ -38,10 +47,14 @@ export const HolyricsDashboard = () => {
 
     setLastCommand(command);
 
+    const cNorm = normalizeText(command);
+
     try {
       // Verificar se é um comando de versículo específico
       if (command.startsWith('verse:')) {
         const reference = command.replace('verse:', '');
+        // Garante que a Bíblia esteja aberta antes de exibir o versículo
+        await openBible();
         const result = await showVerse(reference);
         if (result) {
           setCurrentDisplay(`Bíblia - ${reference}`);
@@ -61,7 +74,7 @@ export const HolyricsDashboard = () => {
       }
 
       // Comandos básicos
-      if (command.includes("abrir bíblia")) {
+      if (cNorm.includes('abrir biblia')) {
         const result = await openBible();
         if (result) {
           setCurrentDisplay("bíblia aberta");
@@ -70,7 +83,7 @@ export const HolyricsDashboard = () => {
             description: "Bíblia aberta no Holyrics",
           });
         }
-      } else if (command.includes("fechar bíblia")) {
+      } else if (cNorm.includes('fechar biblia')) {
         const result = await closeBible();
         if (result) {
           // Mostrar tema principal após fechar bíblia
@@ -81,7 +94,7 @@ export const HolyricsDashboard = () => {
             description: "Bíblia fechada - Tema principal exibido",
           });
         }
-      } else if (command.includes("próximo versículo")) {
+      } else if (cNorm.includes('proximo versiculo') || cNorm.includes('proximo verso')) {
         const result = await nextVerse();
         if (result) {
           setCurrentDisplay("bíblia aberta - próximo versículo");
@@ -90,7 +103,7 @@ export const HolyricsDashboard = () => {
             description: "Próximo versículo exibido",
           });
         }
-      } else if (command.includes("versículo anterior")) {
+      } else if (cNorm.includes('versiculo anterior') || cNorm.includes('verso anterior')) {
         const result = await previousVerse();
         if (result) {
           setCurrentDisplay("bíblia aberta - versículo anterior");
