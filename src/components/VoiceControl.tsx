@@ -133,8 +133,36 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
         }
       };
 
-      recognitionInstance.onerror = () => {
-        toast({ title: "Erro no reconhecimento", description: "Tente novamente", variant: "destructive" });
+      recognitionInstance.onerror = (event: any) => {
+        console.error('Erro de reconhecimento de voz:', event.error, event);
+        
+        // Ignorar erro "no-speech" e "aborted" (são normais)
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return;
+        }
+        
+        // Tratar erro "not-allowed" (permissão negada)
+        if (event.error === 'not-allowed') {
+          toast({ 
+            title: "Permissão negada", 
+            description: "Permita o acesso ao microfone nas configurações do navegador", 
+            variant: "destructive" 
+          });
+          setIsListening(false);
+          listeningRef.current = false;
+          return;
+        }
+        
+        // Outros erros
+        const errorMessages: Record<string, string> = {
+          'network': 'Erro de rede. Verifique sua conexão.',
+          'audio-capture': 'Erro ao capturar áudio. Verifique seu microfone.',
+          'service-not-allowed': 'Serviço de reconhecimento não permitido.'
+        };
+        
+        const description = errorMessages[event.error] || `Erro: ${event.error}. Tente novamente.`;
+        
+        toast({ title: "Erro no reconhecimento de voz", description, variant: "destructive" });
         setIsListening(false);
         listeningRef.current = false;
       };
