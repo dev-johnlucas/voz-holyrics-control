@@ -130,6 +130,8 @@ export const SetupConfig = ({ onConfigComplete, initialConfig }: SetupConfigProp
           local_port: config.localPort,
           token: config.token,
           api_key: config.apiKey,
+        }, {
+          onConflict: 'user_id'
         });
 
       if (upsertError) {
