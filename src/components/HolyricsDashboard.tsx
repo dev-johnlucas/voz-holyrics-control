@@ -36,15 +36,6 @@ export const HolyricsDashboard = () => {
   };
 
   const handleCommand = async (command: string) => {
-    if (!isConnected) {
-      toast({
-        title: "Sem conexão",
-        description: "Conecte-se ao Holyrics primeiro",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLastCommand(command);
 
     const cNorm = normalizeText(command);
