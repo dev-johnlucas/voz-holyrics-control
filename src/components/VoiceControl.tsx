@@ -73,6 +73,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       
+      recognitionInstance.lang = 'pt-BR';
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = true; // Habilita resultados intermediários para melhor sensibilidade
       recognitionInstance.maxAlternatives = 3; // Mantém algumas alternativas
@@ -104,8 +105,18 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
         if (lastResult.isFinal) {
           console.log('Comando de voz recebido:', transcriptRaw);
 
-          // 1) Referência bíblica (aceita números por extenso via util)
-          const verseReference = parseVerseReference(transcriptRaw);
+          // 1) Referência bíblica (checa todas as alternativas do STT)
+          const candidates = Array.from(new Set([
+            ...alts.map((a) => a.transcript.toLowerCase().trim()),
+            transcriptRaw,
+          ]));
+
+          let verseReference: string | null = null;
+          for (const cand of candidates) {
+            const parsed = parseBibleReferencePT(cand);
+            if (parsed) { verseReference = parsed; break; }
+          }
+
           if (verseReference) {
             toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
             onCommand(`verse:${verseReference}`);
