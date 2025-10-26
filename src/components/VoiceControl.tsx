@@ -56,11 +56,11 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
     ],
     next: [
       'proximo versiculo', 'proximo verso', 'proximo', 'avancar', 'avanca',
-      'ir para o proximo', 'ir pro proximo'
+      'ir para o proximo', 'ir pro proximo', 'passa', 'pode passar', 'vai pro proximo', 'vai para o proximo', 'seguinte'
     ],
     prev: [
       'versiculo anterior', 'voltar versiculo', 'anterior', 'voltar', 'retroceder',
-      'verso anterior'
+      'verso anterior', 'volta', 'retorna', 'voltar o versiculo', 'versiculo de tras'
     ],
   } as const;
 
@@ -76,7 +76,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = true; // Habilita resultados intermediários para melhor sensibilidade
       recognitionInstance.maxAlternatives = 3; // Mantém algumas alternativas
-
+      recognitionInstance.lang = 'pt-BR'; // Força PT-BR para melhor reconhecimento de português
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
@@ -104,11 +104,16 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
         if (lastResult.isFinal) {
           console.log('Comando de voz recebido:', transcriptRaw);
 
-          // 1) Referência bíblica (aceita números por extenso via util)
-          const verseReference = parseVerseReference(transcriptRaw);
-          if (verseReference) {
-            toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
-            onCommand(`verse:${verseReference}`);
+          // 1) Referência bíblica (tenta todas as alternativas reconhecidas)
+          const allTranscripts = alts.map(a => a.transcript.toLowerCase().trim());
+          let recognizedRef: string | null = null;
+          for (const t of allTranscripts) {
+            const ref = parseVerseReference(t);
+            if (ref) { recognizedRef = ref; break; }
+          }
+          if (recognizedRef) {
+            toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${recognizedRef}` });
+            onCommand(`verse:${recognizedRef}`);
             return;
           }
 
