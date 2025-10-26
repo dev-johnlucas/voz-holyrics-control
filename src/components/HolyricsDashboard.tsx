@@ -44,8 +44,7 @@ export const HolyricsDashboard = () => {
       // Verificar se é um comando de versículo específico
       if (command.startsWith('verse:')) {
         const reference = command.replace('verse:', '');
-        // Garante que a Bíblia esteja aberta antes de exibir o versículo
-        await openBible();
+        // Exibe diretamente o versículo solicitado (ShowVerse já abre a apresentação)
         const result = await showVerse(reference);
         if (result) {
           setCurrentDisplay(`Bíblia - ${reference}`);
