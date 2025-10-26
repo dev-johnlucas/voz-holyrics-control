@@ -43,24 +43,14 @@ export const HolyricsDashboard = () => {
     try {
       // Verificar se é um comando de versículo específico
       if (command.startsWith('verse:')) {
-        const reference = command.replace('verse:', '').trim();
-        // Tenta exibir diretamente o versículo; se falhar, abre a Bíblia e tenta novamente
-        let result = await showVerse(reference);
-        if (!(result && result.status === 'ok')) {
-          await openBible();
-          result = await showVerse(reference);
-        }
-        if (result && result.status === 'ok') {
+        const reference = command.replace('verse:', '');
+        // Exibe diretamente o versículo solicitado (ShowVerse já abre a apresentação)
+        const result = await showVerse(reference);
+        if (result) {
           setCurrentDisplay(`Bíblia - ${reference}`);
           toast({
             title: "Comando executado",
             description: `Abrindo ${reference}`,
-          });
-        } else {
-          toast({
-            title: "Erro ao exibir versículo",
-            description: `Não foi possível exibir ${reference}`,
-            variant: "destructive",
           });
         }
         return;

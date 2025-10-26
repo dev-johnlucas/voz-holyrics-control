@@ -56,11 +56,13 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
     ],
     next: [
       'proximo versiculo', 'proximo verso', 'proximo', 'avancar', 'avanca',
-      'ir para o proximo', 'ir pro proximo'
+      'ir para o proximo', 'ir pro proximo', 'passa', 'passa versiculo',
+      'passa verso', 'avanca versiculo', 'avanca verso', 'seguinte', 'vai'
     ],
     prev: [
       'versiculo anterior', 'voltar versiculo', 'anterior', 'voltar', 'retroceder',
-      'verso anterior'
+      'verso anterior', 'volta', 'volta versiculo', 'volta verso',
+      'retrocede versiculo', 'retrocede verso', 'antes'
     ],
   } as const;
 
@@ -73,7 +75,6 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       
-      recognitionInstance.lang = 'pt-BR';
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = true; // Habilita resultados intermediários para melhor sensibilidade
       recognitionInstance.maxAlternatives = 3; // Mantém algumas alternativas
@@ -104,26 +105,40 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
 
         if (lastResult.isFinal) {
           console.log('Comando de voz recebido:', transcriptRaw);
+          console.log('Texto normalizado:', tNorm);
 
-          // 1) Referência bíblica (checa todas as alternativas do STT)
-          const candidates = Array.from(new Set([
-            ...alts.map((a) => a.transcript.toLowerCase().trim()),
-            transcriptRaw,
-          ]));
+          // 1) Comandos de navegação têm prioridade para evitar falsos positivos com referências
+          const hasAny = (list: readonly string[]) => list.some((k) => tNorm.includes(k));
 
-          let verseReference: string | null = null;
-          for (const cand of candidates) {
-            const parsed = parseBibleReferencePT(cand);
-            if (parsed) { verseReference = parsed; break; }
+          if (hasAny(commandMatchers.next)) {
+            onCommand('próximo versículo');
+            toast({ title: 'Comando', description: 'Próximo versículo' });
+            return;
+          }
+          if (hasAny(commandMatchers.prev)) {
+            onCommand('versículo anterior');
+            toast({ title: 'Comando', description: 'Versículo anterior' });
+            return;
           }
 
+          // 2) Referência bíblica (aceita números por extenso via util)
+          // Tenta múltiplas alternativas de transcrição para melhor acurácia
+          let verseReference: string | null = null;
+          for (const alt of alts) {
+            verseReference = parseVerseReference(alt.transcript);
+            if (verseReference) {
+              console.log('Referência detectada:', verseReference, 'de:', alt.transcript);
+              break;
+            }
+          }
+          
           if (verseReference) {
             toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
             onCommand(`verse:${verseReference}`);
             return;
           }
 
-          // 2) Imagens por voz (normaliza para bater independentemente de acentos)
+          // 3) Imagens por voz (normaliza para bater independentemente de acentos)
           const matchedImage = imageNames.find((n) => tNorm.includes(normalizeText(n)));
           if (matchedImage || tNorm.includes('tema principal')) {
             const name = matchedImage ?? 'tema principal';
@@ -132,9 +147,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
             return;
           }
 
-          // 3) Comandos básicos (open/close/next/prev) com sinônimos + heurísticas
-          const hasAny = (list: readonly string[]) => list.some((k) => tNorm.includes(k));
-
+          // 4) Comandos básicos de abrir/fechar com heurísticas
           // Heurística: mencionar "biblia" sem termos de fechamento => abrir
           if (tNorm.includes('biblia') && !tNorm.includes('fechar') && !tNorm.includes('ocultar')) {
             onCommand('abrir bíblia');
@@ -152,16 +165,9 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
             toast({ title: 'Comando', description: 'Fechando Bíblia' });
             return;
           }
-          if (hasAny(commandMatchers.next)) {
-            onCommand('próximo versículo');
-            toast({ title: 'Comando', description: 'Próximo versículo' });
-            return;
-          }
-          if (hasAny(commandMatchers.prev)) {
-            onCommand('versículo anterior');
-            toast({ title: 'Comando', description: 'Versículo anterior' });
-            return;
-          }
+
+          // 5) Se não reconheceu nada, mostra o que foi ouvido
+          console.log('Comando não reconhecido:', transcriptRaw);
         }
       };
 
