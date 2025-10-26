@@ -15,7 +15,6 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
   const listeningRef = useRef(false);
-  const noSpeechCountRef = useRef(0);
   const [imageNames, setImageNames] = useState<string[]>([]);
   const { toast } = useToast();
   const { getImages } = useHolyricsAPI();
@@ -73,14 +72,13 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
       
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = true; // Habilita resultados intermediários para melhor sensibilidade
-      recognitionInstance.maxAlternatives = 3; // Mantém algumas alternativas
-
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = false; // Mudado para evitar comandos duplicados
+      recognitionInstance.lang = 'pt-BR';
+      recognitionInstance.maxAlternatives = 3; // Reduzido para melhor precisão
 
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
-        noSpeechCountRef.current = 0;
       };
 
       recognitionInstance.onend = () => {
@@ -108,7 +106,9 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
           const verseReference = parseVerseReference(transcriptRaw);
           if (verseReference) {
             toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
-            onCommand(`verse:${verseReference}`);
+            // Garantir que a Bíblia esteja aberta antes de enviar o versículo
+            onCommand('abrir bíblia');
+            setTimeout(() => onCommand(`verse:${verseReference}`), 250);
             return;
           }
 
@@ -157,20 +157,18 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       recognitionInstance.onerror = (event: any) => {
         console.error('Erro de reconhecimento de voz:', event.error, event);
         
-          if (event.error === 'no-speech') {
-            // Silêncio: reinicia suavemente e sugere ajuste após tentativas
-            if (listeningRef.current) {
-              noSpeechCountRef.current += 1;
-              try { recognitionInstance.abort(); } catch {}
-              setTimeout(() => {
-                try { if (listeningRef.current) recognitionInstance.start(); } catch {}
-              }, 300);
-              if (noSpeechCountRef.current % 4 === 0) {
-                toast({ title: 'Sem áudio detectado', description: 'Fale mais próximo ao microfone ou ajuste em "Configurar Áudio".' });
-              }
-            }
-            return;
+        if (event.error === 'no-speech') {
+          // Silêncio: apenas reinicia se estivermos escutando
+          if (listeningRef.current) {
+            try {
+              recognitionInstance.stop();
+            } catch {}
+            try {
+              recognitionInstance.start();
+            } catch {}
           }
+          return;
+        }
         
         if (event.error === 'aborted') {
           // Evento normal quando paramos manualmente
