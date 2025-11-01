@@ -94,7 +94,8 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
 
       recognitionInstance.onresult = (event: any) => {
         const lastResult = event.results[event.results.length - 1];
-        // Use a melhor alternativa com maior confiança
+        
+        // Processa tanto resultados intermediários quanto finais para melhor responsividade
         const alts: { transcript: string; confidence: number }[] = [];
         for (let i = 0; i < lastResult.length; i++) {
           alts.push({ transcript: lastResult[i].transcript, confidence: lastResult[i].confidence ?? 0 });
@@ -103,91 +104,106 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
         const transcriptRaw = best.transcript.toLowerCase().trim();
         const tNorm = normalizeText(transcriptRaw);
 
+        // Só processa comandos quando o resultado é final
         if (lastResult.isFinal) {
           console.log('Comando de voz recebido:', transcriptRaw);
           console.log('Texto normalizado:', tNorm);
 
-          // 1) Comandos de navegação têm prioridade para evitar falsos positivos com referências
+          // 1) Comandos de navegação têm prioridade absoluta
           const hasAny = (list: readonly string[]) => list.some((k) => tNorm.includes(k));
 
           if (hasAny(commandMatchers.next)) {
+            console.log('Comando detectado: próximo versículo');
             onCommand('próximo versículo');
             toast({ title: 'Comando', description: 'Próximo versículo' });
             return;
           }
           if (hasAny(commandMatchers.prev)) {
+            console.log('Comando detectado: versículo anterior');
             onCommand('versículo anterior');
             toast({ title: 'Comando', description: 'Versículo anterior' });
             return;
           }
 
-          // 2) Referência bíblica (aceita números por extenso via util)
-          // Tenta múltiplas alternativas de transcrição para melhor acurácia
-          let verseReference: string | null = null;
-          for (const alt of alts) {
-            verseReference = parseVerseReference(alt.transcript);
-            if (verseReference) {
-              console.log('Referência detectada:', verseReference, 'de:', alt.transcript);
-              break;
-            }
-          }
-          
-          if (verseReference) {
-            toast({ title: 'Referência bíblica reconhecida', description: `Abrindo ${verseReference}` });
-            onCommand(`verse:${verseReference}`);
-            return;
-          }
-
-          // 3) Imagens por voz (normaliza para bater independentemente de acentos)
-          const matchedImage = imageNames.find((n) => tNorm.includes(normalizeText(n)));
-          if (matchedImage || tNorm.includes('tema principal')) {
-            const name = matchedImage ?? 'tema principal';
-            toast({ title: 'Imagem reconhecida', description: `Exibindo "${name}"` });
-            onCommand(`image:${name}`);
-            return;
-          }
-
-          // 4) Comandos básicos de abrir/fechar com heurísticas
-          // Heurística: mencionar "biblia" sem termos de fechamento => abrir
-          if (tNorm.includes('biblia') && !tNorm.includes('fechar') && !tNorm.includes('ocultar')) {
-            onCommand('abrir bíblia');
-            toast({ title: 'Comando', description: 'Abrindo Bíblia' });
-            return;
-          }
-
+          // 2) Comandos básicos de abrir/fechar (antes de referências para evitar conflitos)
           if (hasAny(commandMatchers.open)) {
+            console.log('Comando detectado: abrir bíblia');
             onCommand('abrir bíblia');
             toast({ title: 'Comando', description: 'Abrindo Bíblia' });
             return;
           }
           if (hasAny(commandMatchers.close)) {
+            console.log('Comando detectado: fechar bíblia');
             onCommand('fechar bíblia');
             toast({ title: 'Comando', description: 'Fechando Bíblia' });
             return;
           }
 
-          // 5) Se não reconheceu nada, mostra o que foi ouvido
-          console.log('Comando não reconhecido:', transcriptRaw);
+          // 3) Referência bíblica - tenta todas as alternativas
+          let verseReference: string | null = null;
+          for (const alt of alts) {
+            verseReference = parseVerseReference(alt.transcript);
+            if (verseReference) {
+              console.log('Referência bíblica detectada:', verseReference, 'de:', alt.transcript);
+              break;
+            }
+          }
+          
+          if (verseReference) {
+            toast({ title: 'Referência bíblica', description: `Abrindo ${verseReference}` });
+            onCommand(`verse:${verseReference}`);
+            return;
+          }
+
+          // 4) Imagens por voz
+          const matchedImage = imageNames.find((n) => tNorm.includes(normalizeText(n)));
+          if (matchedImage || tNorm.includes('tema principal')) {
+            const name = matchedImage ?? 'tema principal';
+            console.log('Imagem detectada:', name);
+            toast({ title: 'Imagem reconhecida', description: `Exibindo "${name}"` });
+            onCommand(`image:${name}`);
+            return;
+          }
+
+          // 5) Se nada foi reconhecido
+          console.log('Nenhum comando reconhecido para:', transcriptRaw);
+          toast({ 
+            title: 'Não reconhecido', 
+            description: `"${transcriptRaw}" - Tente: "próximo", "anterior" ou uma referência como "João 3 16"`,
+            variant: 'destructive'
+          });
         }
       };
 
       recognitionInstance.onerror = (event: any) => {
-        console.error('Erro de reconhecimento de voz:', event.error, event);
+        console.error('Erro de reconhecimento de voz:', event.error);
         
-          if (event.error === 'no-speech') {
-            // Silêncio: reinicia suavemente e sugere ajuste após tentativas
-            if (listeningRef.current) {
-              noSpeechCountRef.current += 1;
-              try { recognitionInstance.abort(); } catch {}
-              setTimeout(() => {
-                try { if (listeningRef.current) recognitionInstance.start(); } catch {}
-              }, 300);
-              if (noSpeechCountRef.current % 4 === 0) {
-                toast({ title: 'Sem áudio detectado', description: 'Fale mais próximo ao microfone ou ajuste em "Configurar Áudio".' });
+        if (event.error === 'no-speech') {
+          // Silêncio detectado - não mostra erro constante, apenas reinicia
+          if (listeningRef.current) {
+            noSpeechCountRef.current += 1;
+            try { recognitionInstance.abort(); } catch {}
+            setTimeout(() => {
+              try { 
+                if (listeningRef.current) {
+                  recognitionInstance.start();
+                }
+              } catch (e) {
+                console.warn('Falha ao reiniciar após no-speech:', e);
               }
+            }, 200);
+            
+            // Só alerta após muitas tentativas
+            if (noSpeechCountRef.current === 8) {
+              toast({ 
+                title: 'Sem áudio detectado', 
+                description: 'Fale mais próximo ao microfone. Comandos: "próximo", "anterior", "João 3 16"'
+              });
+              noSpeechCountRef.current = 0; // Reset counter
             }
-            return;
           }
+          return;
+        }
         
         if (event.error === 'aborted') {
           // Evento normal quando paramos manualmente
