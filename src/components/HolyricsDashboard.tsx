@@ -44,13 +44,20 @@ export const HolyricsDashboard = () => {
       // Verificar se é um comando de versículo específico
       if (command.startsWith('verse:')) {
         const reference = command.replace('verse:', '');
-        // Exibe diretamente o versículo solicitado (ShowVerse já abre a apresentação)
+        
+        // Primeiro garantir que a bíblia está aberta
+        await openBible();
+        
+        // Pequeno delay para garantir que a bíblia abriu
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Exibe o versículo solicitado
         const result = await showVerse(reference);
         if (result) {
           setCurrentDisplay(`Bíblia - ${reference}`);
           toast({
-            title: "Comando executado",
-            description: `Abrindo ${reference}`,
+            title: "Versículo exibido",
+            description: `${reference} no telão`,
           });
         }
         return;

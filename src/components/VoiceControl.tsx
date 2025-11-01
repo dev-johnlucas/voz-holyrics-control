@@ -48,6 +48,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
     open: [
       'abrir biblia', 'abrir a biblia', 'mostrar biblia', 'mostrar a biblia',
       'exibir biblia', 'exibir a biblia', 'abra biblia', 'abra a biblia',
+      'abra sua biblia', 'abra a sua biblia',
       'abrir palavra', 'abrir a palavra', 'abrir escritura', 'abrir as escrituras'
     ],
     close: [
