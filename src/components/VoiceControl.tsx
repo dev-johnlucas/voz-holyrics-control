@@ -79,8 +79,7 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = true; // Habilita resultados intermediários para melhor sensibilidade
       recognitionInstance.maxAlternatives = 3; // Mantém algumas alternativas
-
-
+      recognitionInstance.lang = 'pt-BR';
       recognitionInstance.onstart = () => {
         console.log('Reconhecimento iniciado');
         noSpeechCountRef.current = 0;

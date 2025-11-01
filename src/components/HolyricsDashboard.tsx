@@ -7,6 +7,7 @@ import { ImageGallery } from "./ImageGallery";
 import { AudioConfig } from "./AudioConfig";
 import { useToast } from "@/hooks/use-toast";
 import { useHolyricsAPI } from "@/hooks/useHolyricsAPI";
+import { parseBibleReferencePT } from "@/lib/bible";
 
 export const HolyricsDashboard = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -59,6 +60,19 @@ export const HolyricsDashboard = () => {
             title: "Versículo exibido",
             description: `${reference} no telão`,
           });
+        }
+        return;
+      }
+
+      // Se o texto contiver uma referência bíblica (fallback sem prefixo), abre e mostra
+      const parsedRef = parseBibleReferencePT(command);
+      if (!command.startsWith('image:') && parsedRef) {
+        await openBible();
+        await new Promise((r) => setTimeout(r, 500));
+        const result = await showVerse(parsedRef);
+        if (result) {
+          setCurrentDisplay(`Bíblia - ${parsedRef}`);
+          toast({ title: "Versículo exibido", description: `${parsedRef} no telão` });
         }
         return;
       }
