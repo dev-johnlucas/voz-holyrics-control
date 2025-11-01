@@ -161,36 +161,60 @@ const wordsToDigitsInText = (s: string) => {
 
 export const parseBibleReferencePT = (input: string): string | null => {
   if (!input) return null;
-  const text = wordsToDigitsInText(normalizeOrdinals(normalize(input)));
+  
+  console.log('[Bible Parser] Input original:', input);
+  
+  // Primeiro converte números por extenso e ordinais
+  let text = wordsToDigitsInText(normalizeOrdinals(normalize(input)));
+  console.log('[Bible Parser] Texto normalizado:', text);
 
-  // Try to find a book key (longest first)
+  // Try to find a book key (longest first to avoid partial matches)
   const keys = Object.keys(booksPT).sort((a, b) => b.length - a.length);
   let matchedKey: string | null = null;
   let abbrev = "";
   let idx = -1;
 
   for (const key of keys) {
-    const re = new RegExp(`(^|\\b)${key}(\\b)`, "i");
+    // Busca o nome do livro com fronteiras de palavra mais flexíveis
+    const re = new RegExp(`(^|\\s)${key}(\\s|$)`, "i");
     const m = text.match(re);
     if (m) {
       matchedKey = key;
       abbrev = booksPT[key];
       idx = m.index !== undefined ? m.index + m[0].length : -1;
+      console.log('[Bible Parser] Livro encontrado:', key, '→', abbrev);
       break;
     }
   }
 
-  if (!matchedKey) return null;
+  if (!matchedKey) {
+    console.log('[Bible Parser] Nenhum livro encontrado');
+    return null;
+  }
 
   // Look for chapter and verse numbers after the matched book name
   const rest = text.slice(idx).trim();
-  // Accept patterns like: 3:16, 3 16, cap 3 vers 16, capítulo 3 versículo 16 (após conversão de números por extenso)
-  const numMatch = rest.match(/(\d{1,3})\D+(\d{1,3})/);
-  if (!numMatch) return null;
+  console.log('[Bible Parser] Buscando cap:vers em:', rest);
+  
+  // Aceita múltiplos formatos:
+  // - "3:16", "3 16", "capítulo 3 versículo 16", "cap 3 vers 16"
+  // - Também aceita quando há apenas 1 número após o livro (assume versículo 1)
+  const numMatch = rest.match(/(\d{1,3})(?:\D+(\d{1,3}))?/);
+  
+  if (!numMatch) {
+    console.log('[Bible Parser] Nenhum número encontrado após o livro');
+    return null;
+  }
 
   const chapter = numMatch[1];
-  const verse = numMatch[2];
-  if (!chapter || !verse) return null;
+  const verse = numMatch[2] || "1"; // Se não tiver versículo, assume 1
+  
+  if (!chapter) {
+    console.log('[Bible Parser] Capítulo não encontrado');
+    return null;
+  }
 
-  return `${abbrev} ${chapter}:${verse}`;
+  const result = `${abbrev} ${chapter}:${verse}`;
+  console.log('[Bible Parser] ✅ Resultado:', result);
+  return result;
 };

@@ -139,20 +139,29 @@ export const VoiceControl = ({ onCommand, isConnected = true }: VoiceControlProp
             return;
           }
 
-          // 3) Referência bíblica - tenta todas as alternativas
+          // 3) Referência bíblica - tenta o texto original E todas as alternativas
           let verseReference: string | null = null;
-          for (const alt of alts) {
-            verseReference = parseVerseReference(alt.transcript);
-            if (verseReference) {
-              console.log('Referência bíblica detectada:', verseReference, 'de:', alt.transcript);
-              break;
-            }
-          }
           
+          // Tenta o melhor resultado primeiro
+          verseReference = parseVerseReference(transcriptRaw);
           if (verseReference) {
-            toast({ title: 'Referência bíblica', description: `Abrindo ${verseReference}` });
+            console.log('✅ Referência bíblica detectada:', verseReference, 'de:', transcriptRaw);
+            toast({ title: 'Bíblia', description: `Abrindo ${verseReference}` });
             onCommand(`verse:${verseReference}`);
             return;
+          }
+          
+          // Se não encontrou, tenta alternativas
+          for (const alt of alts) {
+            if (alt.transcript !== transcriptRaw) {
+              verseReference = parseVerseReference(alt.transcript);
+              if (verseReference) {
+                console.log('✅ Referência bíblica detectada (alternativa):', verseReference, 'de:', alt.transcript);
+                toast({ title: 'Bíblia', description: `Abrindo ${verseReference}` });
+                onCommand(`verse:${verseReference}`);
+                return;
+              }
+            }
           }
 
           // 4) Imagens por voz
